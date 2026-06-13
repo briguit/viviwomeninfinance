@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -13,8 +13,8 @@
 }
 
 html, body {
-  background-color: #FAFAF9;
-  font-family: 'Poppins', Verdana, Arial, sans-serif;
+  background-color: #fef7ff;
+  font-family: 'Manrope', Verdana, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -24,13 +24,13 @@ html, body {
   margin: 0 auto;
   min-height: 100dvh;
   position: relative;
-  background: #FAFAF9;
+  background: #fef7ff;
 }
 
 /* Desktop: show a subtle outer background */
 @media (min-width: 431px) {
   body {
-    background: #E8E4F8;
+    background: #e8dfee;
   }
 }
 

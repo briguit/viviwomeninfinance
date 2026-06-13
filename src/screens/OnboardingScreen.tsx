@@ -163,73 +163,83 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
   // SPLASH
   // ══════════════════════════════════════════════════════════════════════════
   if (step === 'splash') {
+    const f = 'Manrope, Verdana, Arial, sans-serif'
     return (
       <div
         className="app-shell flex flex-col"
-        style={{ background: '#F8F7FF', height: '100dvh' }}
+        style={{ background: '#fef7ff', height: '100dvh' }}
       >
-        {/* Language toggle – top right */}
+        {/* Language toggle */}
         <div className="flex justify-end px-5 pt-10 flex-shrink-0">
           <LanguageToggle />
         </div>
 
-        {/* Content — padded sides, centered */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 24px 24px' }}>
+        {/* Content */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 20px 32px' }}>
 
-          {/* Logo — centrado y prominente */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32 }}>
-            <img src="/vivi-logo.svg" alt="Vivi" style={{ height: 86, width: 86, marginBottom: 8 }} />
-            <span style={{ fontSize: 36, fontWeight: 700, color: '#7C3AED', letterSpacing: '0.01em', fontFamily: "'Poppins', 'Nunito', sans-serif" }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 40 }}>
+            <img src="/vivi-logo.svg" alt="Vivi" style={{ height: 88, width: 88, marginBottom: 12 }} />
+            <span style={{ fontFamily: f, fontSize: 40, fontWeight: 800, color: '#7C3AED', letterSpacing: '-0.02em', lineHeight: 1 }}>
               Vivi
             </span>
           </div>
 
-          {/* Headline */}
-          <h1
-            className="font-bold text-vivi-deep leading-tight"
-            style={{ fontSize: 30, marginBottom: 10, whiteSpace: 'pre-line' }}
-          >
+          {/* Headline — display-lg mobile spec */}
+          <h1 style={{
+            fontFamily: f, fontSize: 28, fontWeight: 700,
+            lineHeight: '36px', letterSpacing: '-0.01em',
+            color: '#1d1a24', marginBottom: 12, whiteSpace: 'pre-line',
+          }}>
             {tx.splash_headline}
           </h1>
 
-          {/* Sub */}
-          <p className="text-vivi-gray" style={{ fontSize: 15, lineHeight: 1.6, marginBottom: 28 }}>
+          {/* Sub — body-md spec */}
+          <p style={{
+            fontFamily: f, fontSize: 16, fontWeight: 400,
+            lineHeight: '24px', color: '#4a4455', marginBottom: 32,
+          }}>
             {tx.splash_sub}
           </p>
 
-          {/* Feature list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 32 }}>
+          {/* Feature chips — pill with lavender bg + violet label */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 40 }}>
             {[
               { icon: '💬', text: tx.splash_feat1 },
               { icon: '🎯', text: tx.splash_feat2 },
               { icon: '🔑', text: tx.splash_feat3 },
             ].map(({ icon, text }) => (
-              <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{icon}</span>
-                <span style={{ fontSize: 14, color: '#374151', lineHeight: 1.4 }}>{text}</span>
+              <div key={text} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                background: '#ede9fe', borderRadius: 9999, padding: '10px 16px',
+              }}>
+                <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0 }}>{icon}</span>
+                <span style={{ fontFamily: f, fontSize: 14, fontWeight: 600, color: '#7C3AED', lineHeight: '20px' }}>
+                  {text}
+                </span>
               </div>
             ))}
           </div>
 
-          {/* CTA — opens Privy auth modal */}
+          {/* Primary CTA */}
           <button
             onClick={auth.login}
-            className="w-full font-semibold text-white transition-all active:scale-95"
             style={{
-              height: 52, borderRadius: 16,
-              background: '#7C3AED',
-              fontSize: 16,
-              boxShadow: '0 8px 24px rgba(124,58,237,0.30)',
-              marginBottom: 14,
+              width: '100%', height: 56, borderRadius: 16,
+              background: '#7C3AED', color: '#fff',
+              fontFamily: f, fontSize: 16, fontWeight: 600,
+              boxShadow: '0 8px 24px rgba(124,58,237,0.25)',
+              marginBottom: 16, letterSpacing: '0.01em',
             }}
+            className="transition-all active:scale-95"
           >
             {tx.splash_cta} →
           </button>
 
-          {/* Secondary — same Privy modal for returning users */}
+          {/* Secondary */}
           <button
             onClick={auth.login}
-            className="text-vivi-gray text-sm text-center hover:text-vivi-purple transition-colors"
+            style={{ fontFamily: f, fontSize: 14, fontWeight: 600, color: '#4a4455', background: 'none', textAlign: 'center' }}
           >
             {tx.splash_login}
           </button>

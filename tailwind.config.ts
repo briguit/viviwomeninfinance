@@ -9,16 +9,20 @@ const config: Config = {
       colors: {
         vivi: {
           purple: '#7C3AED',
-          deep: '#2D1B4E',
-          gold: '#FBBF24',
+          deep: '#1d1a24',
+          plum: '#4c1d95',
+          muted: '#4a4455',
+          surface: '#fef7ff',
+          lila: '#ede9fe',
+          gold: '#F59E0B',
           mint: '#10B981',
-          smoke: '#FAFAF9',
           white: '#FFFFFF',
-          gray: '#6B7280',
-          lila: '#EDE9FE',
+          gray: '#4a4455',
+          outline: '#ccc3d8',
         },
       },
       fontFamily: {
+        manrope: ['Manrope', 'Verdana', 'Arial', 'sans-serif'],
         poppins: ['Poppins', 'Verdana', 'Arial', 'sans-serif'],
       },
       maxWidth: {
