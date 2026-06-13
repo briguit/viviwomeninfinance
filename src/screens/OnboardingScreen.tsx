@@ -1,10 +1,11 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
+import { useLoginWithEmail } from '@privy-io/react-auth'
 import { useApp } from '@/context/AppContext'
 import { t } from '@/lib/i18n'
 import { COUNTRIES_LIST } from '@/lib/countryData'
 import LanguageToggle from '@/components/LanguageToggle'
-import { Check, Shield, ChevronLeft } from 'lucide-react'
+import { Check, Shield, ChevronLeft, Mail, Lock, ArrowLeft } from 'lucide-react'
 
 // World ID — imported only when app_id is configured
 let IDKitWidget: React.ComponentType<IDKitProps> | null = null
@@ -31,7 +32,7 @@ interface WorldIDProof {
   verification_level: string
 }
 
-type Step = 'splash' | 'identity' | 'worldid'
+type Step = 'splash' | 'login' | 'identity' | 'worldid'
 
 // ── Progress bar ──────────────────────────────────────────────────────────────
 const STEPS: Step[] = ['identity', 'worldid']
@@ -98,6 +99,7 @@ interface Props { startAtIdentity?: boolean }
 export default function OnboardingScreen({ startAtIdentity = false }: Props) {
   const { lang, auth, saveAndSetUser } = useApp()
   const tx = t[lang]
+  const f = 'Manrope, Verdana, Arial, sans-serif'
 
   const [step, setStep] = useState<Step>(startAtIdentity ? 'identity' : 'splash')
   const [name, setName] = useState('')
@@ -107,16 +109,88 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
   const countryRef = useRef('MX')
   function updateCountry(val: string) { countryRef.current = val; setCountry(val) }
 
+  // ── Login state ────────────────────────────────────────────────────────────
+  const [loginEmail, setLoginEmail]     = useState('')
+  const [loginView, setLoginView]       = useState<'email' | 'otp'>('email')
+  const [otpDigits, setOtpDigits]       = useState(['', '', '', '', '', ''])
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [loginError, setLoginError]     = useState('')
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  const { sendCode, loginWithCode } = useLoginWithEmail({
+    onComplete: () => setStep('identity'),
+  })
+
   const [worldLoading, setWorldLoading] = useState(false)
   const [worldVerified, setWorldVerified] = useState(false)
   const [worldError, setWorldError] = useState(false)
 
-  // When Privy modal completes auth, transition from splash to identity
+  // When Privy auth completes, move to identity step
   useEffect(() => {
-    if (auth.authenticated && step === 'splash') {
+    if (auth.authenticated && (step === 'splash' || step === 'login')) {
       setStep('identity')
     }
   }, [auth.authenticated, step])
+
+  // ── Login handlers ─────────────────────────────────────────────────────────
+  async function handleSendCode(e: React.FormEvent) {
+    e.preventDefault()
+    if (!loginEmail.trim()) return
+    setLoginLoading(true); setLoginError('')
+    try {
+      await sendCode({ email: loginEmail.trim() })
+      setLoginView('otp')
+      setTimeout(() => otpRefs.current[0]?.focus(), 120)
+    } catch {
+      setLoginError(lang === 'es' ? 'No se pudo enviar el código. Intenta de nuevo.' : 'Could not send code. Try again.')
+    } finally { setLoginLoading(false) }
+  }
+
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault()
+    const code = otpDigits.join('')
+    if (code.length < 6) return
+    setLoginLoading(true); setLoginError('')
+    try {
+      await loginWithCode({ code })
+    } catch {
+      setLoginError(lang === 'es' ? 'Código incorrecto. Intenta de nuevo.' : 'Incorrect code. Try again.')
+      setLoginLoading(false)
+    }
+  }
+
+  async function handleResendCode() {
+    try {
+      await sendCode({ email: loginEmail })
+      setOtpDigits(['', '', '', '', '', ''])
+      setLoginError('')
+      setTimeout(() => otpRefs.current[0]?.focus(), 120)
+    } catch {
+      setLoginError(lang === 'es' ? 'Error al reenviar.' : 'Resend failed.')
+    }
+  }
+
+  function handleOtpInput(idx: number, val: string) {
+    const digit = val.replace(/\D/g, '').slice(-1)
+    const next = [...otpDigits]; next[idx] = digit; setOtpDigits(next)
+    if (digit && idx < 5) otpRefs.current[idx + 1]?.focus()
+  }
+
+  function handleOtpKeyDown(idx: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Backspace' && !otpDigits[idx] && idx > 0) {
+      const prev = [...otpDigits]; prev[idx - 1] = ''; setOtpDigits(prev)
+      otpRefs.current[idx - 1]?.focus()
+    }
+  }
+
+  function handleOtpPaste(e: React.ClipboardEvent) {
+    e.preventDefault()
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (!pasted) return
+    const digits = [...pasted.split(''), ...Array(6).fill('')].slice(0, 6)
+    setOtpDigits(digits)
+    otpRefs.current[Math.min(pasted.length - 1, 5)]?.focus()
+  }
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   function handleIdentity() {
@@ -221,7 +295,7 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
           {/* Action area */}
           <div style={{ paddingBottom: 32, display: 'flex', flexDirection: 'column', gap: 16 }}>
             <button
-              onClick={auth.login}
+              onClick={() => setStep('login')}
               style={{
                 width: '100%', height: 56, background: '#630ed4', color: '#fff',
                 fontFamily: f, fontSize: 14, fontWeight: 600, letterSpacing: '0.01em',
@@ -234,7 +308,7 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
             </button>
             <div style={{ textAlign: 'center' }}>
               <button
-                onClick={auth.login}
+                onClick={() => setStep('login')}
                 style={{ fontFamily: f, fontSize: 14, fontWeight: 600, color: '#630ed4', background: 'none', padding: '8px 0' }}
                 className="transition-colors active:scale-95"
               >
@@ -244,6 +318,192 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
           </div>
           <div style={{ height: 32 }} />
         </div>
+      </div>
+    )
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // LOGIN — custom email + OTP screen (headless Privy, matches Stitch design)
+  // ══════════════════════════════════════════════════════════════════════════
+  if (step === 'login') {
+    const otpComplete = otpDigits.every(d => d !== '')
+
+    const inputStyle: React.CSSProperties = {
+      width: '100%', height: 48,
+      background: '#fff', border: '1px solid #ccc3d8', borderRadius: 8,
+      padding: '0 12px 0 44px',
+      fontFamily: f, fontSize: 16, color: '#121c2a', outline: 'none',
+    }
+    const otpInputStyle: React.CSSProperties = {
+      width: 44, height: 56, textAlign: 'center',
+      fontFamily: f, fontSize: 22, fontWeight: 600, color: '#121c2a',
+      background: '#fff', border: '1px solid #ccc3d8', borderRadius: 8, outline: 'none',
+    }
+
+    return (
+      <div
+        className="app-shell"
+        style={{ background: '#f8f9ff', minHeight: '100dvh', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+      >
+        {/* Ambient blobs */}
+        <div style={{ position: 'absolute', top: '-10%', right: '-10%', width: 300, height: 300, borderRadius: '50%', background: '#d2bbff', filter: 'blur(100px)', opacity: 0.40, pointerEvents: 'none', zIndex: 0 }} />
+        <div style={{ position: 'absolute', bottom: '-10%', left: '-10%', width: 360, height: 360, borderRadius: '50%', background: '#ffddb8', filter: 'blur(120px)', opacity: 0.40, pointerEvents: 'none', zIndex: 0 }} />
+
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', position: 'relative', zIndex: 10, width: '100%' }}>
+          {/* "Vivi" header */}
+          <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
+            <h1 style={{ fontFamily: f, fontSize: 28, fontWeight: 700, color: '#630ed4', letterSpacing: '-0.01em' }}>Vivi</h1>
+          </div>
+
+          {/* Glass card */}
+          <div style={{
+            width: '100%',
+            background: 'rgba(255,255,255,0.70)',
+            backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.50)',
+            boxShadow: '0 4px 20px rgba(76,29,149,0.04)',
+            borderRadius: 24, padding: 24,
+          }}>
+            {loginView === 'email' ? (
+              /* ── Email state ── */
+              <div>
+                <div style={{ marginBottom: 24 }}>
+                  <h2 style={{ fontFamily: f, fontSize: 24, fontWeight: 600, lineHeight: '32px', color: '#121c2a', marginBottom: 4 }}>
+                    {lang === 'es' ? 'Bienvenida de nuevo' : 'Welcome back'}
+                  </h2>
+                  <p style={{ fontFamily: f, fontSize: 16, fontWeight: 400, lineHeight: '24px', color: '#4a4455' }}>
+                    {lang === 'es' ? 'Inicia sesión para acceder a tu billetera segura.' : 'Sign in to access your secure wallet.'}
+                  </p>
+                </div>
+
+                <form onSubmit={handleSendCode} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#7b7487', pointerEvents: 'none', display: 'flex' }}>
+                      <Mail size={18} />
+                    </div>
+                    <input
+                      type="email" value={loginEmail} autoFocus required
+                      onChange={e => setLoginEmail(e.target.value)}
+                      placeholder={lang === 'es' ? 'Ingresa tu correo electrónico' : 'Enter your email'}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <button
+                    type="submit" disabled={loginLoading || !loginEmail.trim()}
+                    style={{
+                      width: '100%', height: 44, background: '#630ed4', color: '#fff',
+                      fontFamily: f, fontSize: 14, fontWeight: 600, letterSpacing: '0.01em',
+                      borderRadius: 8, boxShadow: '0 8px 24px rgba(124,58,237,0.12)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      opacity: loginLoading || !loginEmail.trim() ? 0.6 : 1,
+                    }}
+                    className="transition-all active:scale-[0.98]"
+                  >
+                    {loginLoading ? '…' : (lang === 'es' ? 'Enviar Código' : 'Send Code')}
+                  </button>
+                </form>
+
+                {/* Divider */}
+                <div style={{ margin: '24px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ flex: 1, height: 1, background: '#ccc3d8' }} />
+                  <span style={{ fontFamily: f, fontSize: 12, fontWeight: 500, color: '#7b7487', whiteSpace: 'nowrap' }}>
+                    {lang === 'es' ? 'o continúa con' : 'or continue with'}
+                  </span>
+                  <div style={{ flex: 1, height: 1, background: '#ccc3d8' }} />
+                </div>
+
+                {/* Social buttons */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {['Google', 'Apple'].map(p => (
+                    <button key={p} onClick={auth.login} style={{ height: 44, border: '1px solid #ccc3d8', borderRadius: 8, fontFamily: f, fontSize: 14, fontWeight: 600, color: '#121c2a', background: '#fff' }}
+                      className="transition-colors hover:bg-gray-50 active:scale-[0.98]"
+                    >{p}</button>
+                  ))}
+                </div>
+
+                {loginError && <p style={{ fontFamily: f, fontSize: 12, color: '#ba1a1a', marginTop: 12, textAlign: 'center' }}>{loginError}</p>}
+
+                {/* Back to splash */}
+                <button onClick={() => setStep('splash')} style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: f, fontSize: 12, color: '#7b7487', background: 'none', marginTop: 20, marginLeft: -4, padding: 4 }}>
+                  <ArrowLeft size={14} /> {lang === 'es' ? 'Volver' : 'Back'}
+                </button>
+              </div>
+            ) : (
+              /* ── OTP state ── */
+              <div>
+                <button
+                  onClick={() => { setLoginView('email'); setOtpDigits(['','','','','','']); setLoginError('') }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: f, fontSize: 14, fontWeight: 600, color: '#7b7487', background: 'none', marginBottom: 20, padding: '8px 8px 8px 0', marginLeft: -8 }}
+                  className="hover:text-primary transition-colors"
+                >
+                  <ArrowLeft size={18} /> {lang === 'es' ? 'Atrás' : 'Back'}
+                </button>
+
+                <div style={{ marginBottom: 24 }}>
+                  <h2 style={{ fontFamily: f, fontSize: 24, fontWeight: 600, lineHeight: '32px', color: '#121c2a', marginBottom: 4 }}>
+                    {lang === 'es' ? 'Revisa tu correo' : 'Check your email'}
+                  </h2>
+                  <p style={{ fontFamily: f, fontSize: 16, fontWeight: 400, lineHeight: '24px', color: '#4a4455' }}>
+                    {lang === 'es' ? 'Enviamos un código de 6 dígitos a ' : 'We sent a 6-digit code to '}
+                    <span style={{ fontWeight: 600, color: '#630ed4' }}>{loginEmail}</span>
+                  </p>
+                </div>
+
+                <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
+                    {otpDigits.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        ref={el => { otpRefs.current[idx] = el }}
+                        type="number" inputMode="numeric" maxLength={1} value={digit}
+                        onChange={e => handleOtpInput(idx, e.target.value)}
+                        onKeyDown={e => handleOtpKeyDown(idx, e)}
+                        onPaste={idx === 0 ? handleOtpPaste : undefined}
+                        style={otpInputStyle}
+                        className="otp-no-spin"
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="submit" disabled={!otpComplete || loginLoading}
+                    style={{
+                      width: '100%', height: 44, background: '#630ed4', color: '#fff',
+                      fontFamily: f, fontSize: 14, fontWeight: 600, letterSpacing: '0.01em',
+                      borderRadius: 8, boxShadow: '0 8px 24px rgba(124,58,237,0.12)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      opacity: !otpComplete || loginLoading ? 0.5 : 1,
+                      cursor: !otpComplete ? 'not-allowed' : 'pointer',
+                    }}
+                    className="transition-all active:scale-[0.98]"
+                  >
+                    {loginLoading ? '…' : (lang === 'es' ? 'Verificar e Iniciar Sesión' : 'Verify & Sign In')}
+                  </button>
+                </form>
+
+                <div style={{ marginTop: 16, textAlign: 'center' }}>
+                  <p style={{ fontFamily: f, fontSize: 12, fontWeight: 500, color: '#4a4455' }}>
+                    {lang === 'es' ? '¿No recibiste el código? ' : "Didn't receive code? "}
+                    <button onClick={handleResendCode} style={{ color: '#630ed4', fontWeight: 700, background: 'none' }}
+                      className="hover:underline"
+                    >
+                      {lang === 'es' ? 'Reenviar' : 'Resend'}
+                    </button>
+                  </p>
+                </div>
+
+                {loginError && <p style={{ fontFamily: f, fontSize: 12, color: '#ba1a1a', marginTop: 12, textAlign: 'center' }}>{loginError}</p>}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div style={{ marginTop: 32, textAlign: 'center' }}>
+            <p style={{ fontFamily: f, fontSize: 12, fontWeight: 500, color: '#7b7487', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Lock size={14} />
+              {lang === 'es' ? 'Inicio de sesión seguro por Privy' : 'Secure login powered by Privy'}
+            </p>
+          </div>
+        </main>
       </div>
     )
   }

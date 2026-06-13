@@ -34,6 +34,11 @@ html, body {
   }
 }
 
+/* OTP input — hide number spinners */
+.otp-no-spin::-webkit-inner-spin-button,
+.otp-no-spin::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.otp-no-spin { -moz-appearance: textfield; }
+
 /* Scroll utilities */
 .chat-scroll::-webkit-scrollbar { display: none; }
 .chat-scroll { -ms-overflow-style: none; scrollbar-width: none; }
