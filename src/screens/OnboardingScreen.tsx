@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useApp } from '@/context/AppContext'
 import { t } from '@/lib/i18n'
 import { COUNTRIES_LIST } from '@/lib/countryData'
@@ -31,10 +31,10 @@ interface WorldIDProof {
   verification_level: string
 }
 
-type Step = 'splash' | 'register' | 'identity' | 'worldid'
+type Step = 'splash' | 'identity' | 'worldid'
 
 // ── Progress bar ──────────────────────────────────────────────────────────────
-const STEPS: Step[] = ['register', 'identity', 'worldid']
+const STEPS: Step[] = ['identity', 'worldid']
 function ProgressBar({ step }: { step: Step }) {
   const idx = STEPS.indexOf(step)
   if (idx < 0) return null
@@ -100,11 +100,9 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
   const tx = t[lang]
 
   const [step, setStep] = useState<Step>(startAtIdentity ? 'identity' : 'splash')
-  const [email, setEmail] = useState('')
-  const [registerLoading, setRegisterLoading] = useState(false)
   const [name, setName] = useState('')
 
-  // BUG 2 fix: ref tracks the current value for use in closures
+  // ref tracks the current value for use in closures
   const [country, setCountry] = useState('MX')
   const countryRef = useRef('MX')
   function updateCountry(val: string) { countryRef.current = val; setCountry(val) }
@@ -113,17 +111,14 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
   const [worldVerified, setWorldVerified] = useState(false)
   const [worldError, setWorldError] = useState(false)
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
-  function handleRegister() {
-    if (!email.includes('@')) return
-    setRegisterLoading(true)
-    setTimeout(() => {
-      auth.login(email)
-      setRegisterLoading(false)
+  // When Privy modal completes auth, transition from splash to identity
+  useEffect(() => {
+    if (auth.authenticated && step === 'splash') {
       setStep('identity')
-    }, 1800)
-  }
+    }
+  }, [auth.authenticated, step])
 
+  // ── Handlers ───────────────────────────────────────────────────────────────
   function handleIdentity() {
     if (!name.trim()) return
     setStep('worldid')
@@ -211,9 +206,9 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
             ))}
           </div>
 
-          {/* CTA */}
+          {/* CTA — opens Privy auth modal */}
           <button
-            onClick={() => setStep('register')}
+            onClick={auth.login}
             className="w-full font-semibold text-white transition-all active:scale-95"
             style={{
               height: 52, borderRadius: 16,
@@ -226,9 +221,9 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
             {tx.splash_cta} →
           </button>
 
-          {/* Secondary */}
+          {/* Secondary — same Privy modal for returning users */}
           <button
-            onClick={() => setStep('register')}
+            onClick={auth.login}
             className="text-vivi-gray text-sm text-center hover:text-vivi-purple transition-colors"
           >
             {tx.splash_login}
@@ -239,51 +234,7 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // REGISTER (paso 1)
-  // ══════════════════════════════════════════════════════════════════════════
-  if (step === 'register') {
-    return (
-      <StepCard step="register" onBack={() => setStep('splash')}>
-        <div style={{ marginBottom: 20 }}>
-          <h2 className="font-semibold text-vivi-deep" style={{ fontSize: 22, lineHeight: 1.3, marginBottom: 6 }}>
-            {tx.register_title}
-          </h2>
-          <p className="text-vivi-gray" style={{ fontSize: 14 }}>{tx.register_sub}</p>
-        </div>
-
-        {registerLoading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '24px 0' }}>
-            <div className="w-9 h-9 border-4 border-vivi-lila border-t-vivi-purple rounded-full animate-spin" />
-            <p className="text-vivi-purple font-medium text-sm text-center">{tx.register_loading}</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <input
-              type="email"
-              value={email}
-              autoFocus
-              onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleRegister()}
-              placeholder={tx.register_placeholder}
-              style={{ height: 52, borderRadius: 14, border: '1.5px solid #E5E1FF', padding: '0 16px', fontSize: 15, outline: 'none', width: '100%' }}
-              className="text-vivi-deep bg-white focus:border-vivi-purple transition-colors"
-            />
-            <button
-              onClick={handleRegister}
-              disabled={!email.includes('@')}
-              style={{ height: 52, borderRadius: 14, background: '#7C3AED', fontSize: 15 }}
-              className="w-full text-white font-semibold disabled:opacity-40 transition-all active:scale-95"
-            >
-              {tx.register_cta}
-            </button>
-          </div>
-        )}
-      </StepCard>
-    )
-  }
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // IDENTITY (paso 2)
+  // IDENTITY (paso 1 — Privy handles email auth via modal)
   // ══════════════════════════════════════════════════════════════════════════
   if (step === 'identity') {
     const ens = name.trim()
@@ -291,7 +242,7 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
       : null
 
     return (
-      <StepCard step="identity" onBack={() => setStep('register')}>
+      <StepCard step="identity" onBack={() => setStep('splash')}>
         <div style={{ marginBottom: 20 }}>
           <h2 className="font-semibold text-vivi-deep" style={{ fontSize: 22, lineHeight: 1.3, marginBottom: 6 }}>
             {tx.identity_title}

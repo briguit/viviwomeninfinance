@@ -3,14 +3,17 @@ import { useState } from 'react'
 import { useApp } from '@/context/AppContext'
 import { t } from '@/lib/i18n'
 import LanguageToggle from '@/components/LanguageToggle'
-import { ExternalLink, Shield, Star, Award, LogOut, ChevronDown, ChevronUp } from 'lucide-react'
+import { ExternalLink, Shield, Star, Award, LogOut, ChevronDown, ChevronUp, TrendingUp, Zap } from 'lucide-react'
 import { COUNTRY_FLAGS, COUNTRIES_LIST } from '@/lib/countryData'
 
 export default function ProfileScreen() {
-  const { lang, user, handleLogout } = useApp()
+  const { lang, user, handleLogout, walletAddress } = useApp()
   const tx = t[lang]
   const [confirmLogout, setConfirmLogout] = useState(false)
   const [showWallet, setShowWallet] = useState(false)
+  const [earnLoading, setEarnLoading] = useState(false)
+  const [earnSuccess, setEarnSuccess] = useState(false)
+  const [earnError, setEarnError] = useState('')
 
   if (!user) return null
 
@@ -18,6 +21,29 @@ export default function ProfileScreen() {
   const countryLabel = COUNTRIES_LIST.find(c => c.code === user.country)?.label ?? user.country
   const initial      = user.name.charAt(0).toUpperCase()
   const ensUrl       = `https://app.ens.domains/${user.viviEns}`
+
+  async function handleEarnDeposit() {
+    if (!walletAddress) return
+    setEarnLoading(true)
+    setEarnError('')
+    try {
+      const res = await fetch('/api/earn/deposit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress, amount: '1.00' }),
+      })
+      const data = await res.json() as { success: boolean; message?: string }
+      if (data.success) {
+        setEarnSuccess(true)
+      } else {
+        setEarnError(data.message ?? 'Error')
+      }
+    } catch {
+      setEarnError(lang === 'es' ? 'No se pudo conectar. Intenta de nuevo.' : 'Could not connect. Try again.')
+    } finally {
+      setEarnLoading(false)
+    }
+  }
 
   // Badges based on progress
   const badges = [
@@ -89,8 +115,13 @@ export default function ProfileScreen() {
           {showWallet && (
             <div style={{ marginTop: 8, background: '#FAFAF9', borderRadius: 10, padding: '10px 12px' }}>
               <p style={{ fontSize: 10, color: '#6B7280', fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                0x71C7656EC7ab88b098defB751B7401B5f6d8976F
+                {walletAddress ?? (lang === 'es' ? 'Generando wallet…' : 'Generating wallet…')}
               </p>
+              {walletAddress && (
+                <p style={{ fontSize: 9, color: '#10B981', marginTop: 4, fontWeight: 500 }}>
+                  ✓ Privy Embedded Wallet · Base
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -115,6 +146,64 @@ export default function ProfileScreen() {
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981' }} />
             <p style={{ fontSize: 12, color: '#10B981' }}>{tx.profile_growing}</p>
           </div>
+        </div>
+
+        {/* ── Privy Earn card ──────────────────────────────────────────────── */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #065F46 0%, #047857 100%)',
+            borderRadius: 20,
+            padding: '20px',
+            boxShadow: '0 4px 20px rgba(6,95,70,0.20)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <TrendingUp size={16} style={{ color: '#6EE7B7' }} />
+            <p style={{ fontSize: 12, color: '#6EE7B7', fontWeight: 600 }}>
+              {lang === 'es' ? 'PRIVY EARN · Morpho USDC Vault · Base' : 'PRIVY EARN · Morpho USDC Vault · Base'}
+            </p>
+          </div>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5, marginBottom: 14 }}>
+            {lang === 'es'
+              ? 'Gana ~4–6% APY en tu USDC a través de vaults ERC-4626 de Morpho en Base. Powered by Privy Earn.'
+              : 'Earn ~4–6% APY on your USDC via Morpho ERC-4626 vaults on Base. Powered by Privy Earn.'}
+          </p>
+
+          {earnSuccess ? (
+            <div style={{ background: 'rgba(110,231,183,0.15)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Zap size={14} style={{ color: '#6EE7B7' }} />
+              <p style={{ fontSize: 13, color: '#6EE7B7', fontWeight: 500 }}>
+                {lang === 'es' ? '¡Depósito enviado a Privy Earn! 🎉' : 'Deposit sent to Privy Earn! 🎉'}
+              </p>
+            </div>
+          ) : (
+            <button
+              onClick={handleEarnDeposit}
+              disabled={earnLoading || !walletAddress}
+              style={{
+                width: '100%', height: 44, borderRadius: 12,
+                background: earnLoading ? 'rgba(255,255,255,0.15)' : '#10B981',
+                fontSize: 14, fontWeight: 600,
+                color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                cursor: earnLoading || !walletAddress ? 'not-allowed' : 'pointer',
+                opacity: !walletAddress ? 0.6 : 1,
+              }}
+            >
+              {earnLoading ? (
+                <div style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+              ) : (
+                <>
+                  <Zap size={14} />
+                  {lang === 'es' ? 'Depositar 1 USDC y ganar yield' : 'Deposit 1 USDC & earn yield'}
+                </>
+              )}
+            </button>
+          )}
+
+          {earnError && (
+            <p style={{ fontSize: 12, color: '#FCA5A5', marginTop: 8, textAlign: 'center' }}>{earnError}</p>
+          )}
         </div>
 
         {/* ── Stats ────────────────────────────────────────────────────────── */}

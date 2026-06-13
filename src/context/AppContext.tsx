@@ -49,6 +49,7 @@ interface AppContextType {
   setLang: (l: Lang) => void
   user: User | null
   saveAndSetUser: (u: User) => void
+  walletAddress: string | null
   handleLogout: () => void
   chatHistory: ChatMessage[]
   saveChatHistory: (msgs: ChatMessage[]) => void
@@ -154,7 +155,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [auth])
 
   const handleLogout = useCallback(() => {
-    auth.logout()
+    void auth.logout()
     setUser(null)
     setRoute('splash')
     setScreen('chat')
@@ -167,6 +168,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       auth, route, screen, setScreen,
       lang, setLang,
       user, saveAndSetUser,
+      walletAddress: auth.walletAddress,
       handleLogout,
       chatHistory, saveChatHistory,
       challengeStatuses, completeChallengeById,
