@@ -3,14 +3,23 @@ import { useState, useEffect } from 'react'
 import { useApp } from '@/context/AppContext'
 import { t } from '@/lib/i18n'
 import LanguageToggle from '@/components/LanguageToggle'
-import { ExternalLink, Shield, Star, Award, LogOut, ChevronDown, ChevronUp, TrendingUp, Zap, Copy, Check } from 'lucide-react'
+import { ExternalLink, Shield, Star, Award, LogOut, ChevronDown, ChevronUp, TrendingUp, Zap, Copy, Check, Search } from 'lucide-react'
 import { COUNTRY_FLAGS, COUNTRIES_LIST } from '@/lib/countryData'
+import { getEnsProfile, resolveEnsName, type EnsProfile } from '@/lib/ens'
 
 export default function ProfileScreen() {
-  const { lang, user, handleLogout, walletAddress, auth } = useApp()
+  const { lang, user, handleLogout, walletAddress, auth, completeChallengeById, challengeStatuses } = useApp()
   const tx = t[lang]
   const [confirmLogout, setConfirmLogout] = useState(false)
   const [showWallet, setShowWallet] = useState(false)
+
+  // ENS state
+  const [ensProfile, setEnsProfile]             = useState<EnsProfile | null>(null)
+  const [ensLoading, setEnsLoading]             = useState(false)
+  const [ensLookupQuery, setEnsLookupQuery]     = useState('')
+  const [ensLookupResult, setEnsLookupResult]   = useState<{ name: string; address: string | null } | null>(null)
+  const [ensLookupLoading, setEnsLookupLoading] = useState(false)
+  const [ensJustCompleted, setEnsJustCompleted] = useState(false)
 
   // Earn state
   const [savingsWalletId, setSavingsWalletId]       = useState<string | null>(null)
@@ -23,6 +32,25 @@ export default function ProfileScreen() {
   const [copied, setCopied]                         = useState(false)
 
   const userId = auth.userId
+
+  // Fetch real ENS profile from Ethereum mainnet for the authenticated wallet
+  useEffect(() => {
+    if (!walletAddress) return
+    setEnsLoading(true)
+    getEnsProfile(walletAddress)
+      .then(profile => {
+        setEnsProfile(profile)
+        // Cache the name so the AI chat can reference it
+        if (profile.name && userId) localStorage.setItem(`vivi_ens_${userId}`, profile.name)
+        // Auto-complete ENS challenge if this wallet already owns a real ENS name
+        if (profile.name && challengeStatuses['ens'] === 'available') {
+          completeChallengeById('ens', 20)
+          setEnsJustCompleted(true)
+        }
+      })
+      .finally(() => setEnsLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walletAddress])
 
   // Load stored savings wallet from localStorage on mount
   useEffect(() => {
@@ -42,7 +70,6 @@ export default function ProfileScreen() {
   const flag         = COUNTRY_FLAGS[user.country] ?? '🌍'
   const countryLabel = COUNTRIES_LIST.find(c => c.code === user.country)?.label ?? user.country
   const initial      = user.name.charAt(0).toUpperCase()
-  const ensUrl       = `https://app.ens.domains/${user.viviEns}`
 
   // Step 1: Create a Privy server wallet (different from embedded wallet — no user keys)
   async function handleCreateSavingsWallet() {
@@ -95,6 +122,26 @@ export default function ProfileScreen() {
       setDepositError(lang === 'es' ? 'Error de conexión.' : 'Connection error.')
     } finally {
       setDepositLoading(false)
+    }
+  }
+
+  async function handleEnsLookup() {
+    const raw = ensLookupQuery.trim()
+    if (!raw) return
+    const name = raw.includes('.') ? raw : `${raw}.eth`
+    setEnsLookupLoading(true)
+    setEnsLookupResult(null)
+    try {
+      const address = await resolveEnsName(name)
+      setEnsLookupResult({ name, address })
+      if (address && userId) localStorage.setItem(`vivi_ens_${userId}`, name)
+      // Complete ENS challenge on first successful lookup
+      if (address && challengeStatuses['ens'] === 'available') {
+        completeChallengeById('ens', 20)
+        setEnsJustCompleted(true)
+      }
+    } finally {
+      setEnsLookupLoading(false)
     }
   }
 
@@ -345,19 +392,11 @@ export default function ProfileScreen() {
           ))}
         </div>
 
-        {/* ── ENS Identity card (key feature) ─────────────────────────────── */}
-        <div
-          style={{
-            background: '#fff',
-            borderRadius: 20,
-            padding: '20px',
-            border: '1.5px solid rgba(124,58,237,0.2)',
-          }}
-        >
-          <div className="flex items-start gap-3" style={{ marginBottom: 12 }}>
-            <div
-              style={{ width: 40, height: 40, borderRadius: 12, background: '#2D1B4E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-            >
+        {/* ── ENS Identity (real mainnet resolution) ───────────────────────── */}
+        <div style={{ background: '#fff', borderRadius: 20, padding: '20px', border: '1.5px solid rgba(124,58,237,0.2)' }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: '#2D1B4E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <span style={{ fontSize: 20 }}>🔑</span>
             </div>
             <div>
@@ -366,29 +405,147 @@ export default function ProfileScreen() {
             </div>
           </div>
 
-          {/* ENS name displayed prominently */}
-          <div
-            style={{ background: '#F5F3FF', borderRadius: 12, padding: '12px 14px', marginBottom: 12 }}
-          >
-            <p style={{ fontSize: 18, fontWeight: 700, color: '#7C3AED', letterSpacing: '-0.3px' }}>
-              {user.viviEns}
+          {/* ── ENS identity for this wallet ── */}
+          {ensLoading ? (
+            <div style={{ height: 64, background: '#F5F3FF', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 14, height: 14, border: '2px solid rgba(124,58,237,0.3)', borderTopColor: '#7C3AED', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                <p style={{ fontSize: 13, color: '#9CA3AF' }}>
+                  {lang === 'es' ? 'Consultando Ethereum mainnet…' : 'Querying Ethereum mainnet…'}
+                </p>
+              </div>
+            </div>
+          ) : ensProfile?.name ? (
+            <div style={{ background: '#F5F3FF', borderRadius: 12, padding: '14px', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                {ensProfile.avatar && (
+                  <img src={ensProfile.avatar} alt="" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                )}
+                <div>
+                  <p style={{ fontSize: 20, fontWeight: 700, color: '#7C3AED', letterSpacing: '-0.3px', lineHeight: 1.2 }}>
+                    {ensProfile.name}
+                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981' }} />
+                    <p style={{ fontSize: 11, color: '#10B981', fontWeight: 600 }}>
+                      {lang === 'es' ? 'Verificado · Ethereum mainnet' : 'Verified · Ethereum mainnet'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              {ensProfile.description && (
+                <p style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.5, marginTop: 6 }}>{ensProfile.description}</p>
+              )}
+              {ensProfile.twitter && (
+                <p style={{ fontSize: 12, color: '#7C3AED', marginTop: 4, fontWeight: 500 }}>
+                  @{ensProfile.twitter} · Twitter/X
+                </p>
+              )}
+              <a
+                href={`https://app.ens.domains/${ensProfile.name}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 hover:underline"
+                style={{ marginTop: 8, fontSize: 12, color: '#9CA3AF' }}
+              >
+                <ExternalLink size={11} />
+                {lang === 'es' ? 'Ver en ENS App ↗' : 'View on ENS App ↗'}
+              </a>
+            </div>
+          ) : (
+            <div style={{ background: '#F9FAFB', borderRadius: 12, padding: '14px', marginBottom: 16, border: '1px dashed #E5E7EB' }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: '#6B7280', marginBottom: 4 }}>
+                {lang === 'es' ? 'Sin nombre ENS en esta wallet' : 'No ENS name on this wallet'}
+              </p>
+              <p style={{ fontSize: 11, color: '#9CA3AF', fontFamily: 'monospace', wordBreak: 'break-all', lineHeight: 1.5 }}>
+                {walletAddress ?? '—'}
+              </p>
+              <p style={{ fontSize: 11, color: '#9CA3AF', marginTop: 4 }}>
+                {lang === 'es' ? 'Registra un nombre en app.ens.domains para verlo aquí.' : 'Register a name at app.ens.domains to see it here.'}
+              </p>
+            </div>
+          )}
+
+          {/* ── ENS lookup tool — always resolves real names, completes challenge ── */}
+          <div style={{ borderTop: '1px solid #F3F0FF', paddingTop: 14 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#2D1B4E', marginBottom: 8 }}>
+              {lang === 'es' ? 'Explorar identidades ENS' : 'Explore ENS identities'}
             </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                value={ensLookupQuery}
+                onChange={e => setEnsLookupQuery(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && void handleEnsLookup()}
+                placeholder="vitalik.eth"
+                style={{
+                  flex: 1, height: 40, borderRadius: 8,
+                  border: '1px solid #E5E7EB', padding: '0 12px',
+                  fontSize: 14, color: '#2D1B4E', outline: 'none',
+                  fontFamily: 'Manrope, sans-serif',
+                }}
+              />
+              <button
+                onClick={() => void handleEnsLookup()}
+                disabled={ensLookupLoading || !ensLookupQuery.trim()}
+                style={{
+                  height: 40, padding: '0 14px', borderRadius: 8,
+                  background: '#7C3AED', color: '#fff',
+                  fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5,
+                  opacity: ensLookupLoading || !ensLookupQuery.trim() ? 0.5 : 1,
+                  cursor: ensLookupLoading || !ensLookupQuery.trim() ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {ensLookupLoading
+                  ? <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  : <><Search size={14} />{lang === 'es' ? 'Buscar' : 'Look up'}</>
+                }
+              </button>
+            </div>
+
+            {/* Lookup result */}
+            {ensLookupResult && (
+              <div style={{
+                marginTop: 8, padding: '10px 12px', borderRadius: 8,
+                background: ensLookupResult.address ? '#F0FDF4' : '#FEF2F2',
+                border: `1px solid ${ensLookupResult.address ? '#BBF7D0' : '#FECACA'}`,
+              }}>
+                {ensLookupResult.address ? (
+                  <>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: '#16A34A' }}>
+                      ✓ {ensLookupResult.name}
+                    </p>
+                    <p style={{ fontSize: 11, color: '#6B7280', fontFamily: 'monospace', marginTop: 2, wordBreak: 'break-all' }}>
+                      {ensLookupResult.address}
+                    </p>
+                    <a
+                      href={`https://app.ens.domains/${ensLookupResult.name}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 11, color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: 3, marginTop: 4 }}
+                      className="hover:underline"
+                    >
+                      <ExternalLink size={10} />
+                      {lang === 'es' ? 'Ver en ENS App ↗' : 'View on ENS App ↗'}
+                    </a>
+                  </>
+                ) : (
+                  <p style={{ fontSize: 13, color: '#DC2626' }}>
+                    {lang === 'es' ? `"${ensLookupResult.name}" no está registrado` : `"${ensLookupResult.name}" is not registered`}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Challenge completed banner */}
+            {ensJustCompleted && (
+              <div style={{ marginTop: 10, padding: '10px 14px', background: 'linear-gradient(135deg, #EDE9FE, #F5F3FF)', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>🎉</span>
+                <p style={{ fontSize: 13, fontWeight: 600, color: '#7C3AED' }}>
+                  {lang === 'es' ? '¡Reto ENS completado! +20 USDC' : 'ENS challenge completed! +20 USDC'}
+                </p>
+              </div>
+            )}
           </div>
-
-          <p style={{ fontSize: 13, color: '#6B7280', lineHeight: 1.6, marginBottom: 14 }}>
-            {tx.profile_ens_explain}
-          </p>
-
-          <a
-            href={ensUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 font-medium hover:underline transition-colors"
-            style={{ fontSize: 13, color: '#7C3AED' }}
-          >
-            <ExternalLink size={13} />
-            {tx.profile_ens_cta}
-          </a>
         </div>
 
         {/* ── Badges ───────────────────────────────────────────────────────── */}

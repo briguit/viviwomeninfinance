@@ -23,7 +23,7 @@ function buildWelcome(name: string, lang: 'es' | 'en'): string {
 }
 
 export default function ChatScreen() {
-  const { lang, user, chatHistory, saveChatHistory } = useApp()
+  const { lang, user, chatHistory, saveChatHistory, auth } = useApp()
   const tx = t[lang]
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -69,7 +69,8 @@ export default function ChatScreen() {
     setInput('')
     setLoading(true)
     try {
-      const res = await getViviResponse(text, lang, user?.country ?? 'MX')
+      const ensName = auth.userId ? localStorage.getItem(`vivi_ens_${auth.userId}`) : null
+      const res = await getViviResponse(text, lang, user?.country ?? 'MX', ensName)
       const viviMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'vivi',

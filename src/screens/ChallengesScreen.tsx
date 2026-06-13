@@ -14,7 +14,6 @@ interface ChallengeConfig {
   descKey: keyof typeof t.es
   noteKey?: keyof typeof t.es
   badgeKey?: keyof typeof t.es
-  special?: boolean
 }
 
 const CHALLENGES: ChallengeConfig[] = [
@@ -22,7 +21,7 @@ const CHALLENGES: ChallengeConfig[] = [
   { id: 'defi',           emoji: '🔮', reward: 10, titleKey: 'ch2_title', descKey: 'ch2_desc' },
   { id: 'savings',        emoji: '🎯', reward: 10, titleKey: 'ch3_title', descKey: 'ch3_desc' },
   { id: 'verify',         emoji: '🌍', reward: 15, titleKey: 'ch4_title', descKey: 'ch4_desc' },
-  { id: 'ens',            emoji: '🔑', reward: 20, titleKey: 'ch5_title', descKey: 'ch5_desc', noteKey: 'ch5_note', badgeKey: 'ch5_badge', special: true },
+  { id: 'ens',            emoji: '🔑', reward: 20, titleKey: 'ch5_title', descKey: 'ch5_desc', noteKey: 'ch5_note', badgeKey: 'ch5_badge' },
 ]
 
 function StatusIcon({ status }: { status: ChallengeStatus }) {
@@ -34,7 +33,7 @@ function StatusIcon({ status }: { status: ChallengeStatus }) {
 interface ModalData { titleKey: keyof typeof t.es; reward: number }
 
 export default function ChallengesScreen() {
-  const { lang, user, challengeStatuses, completeChallengeById } = useApp()
+  const { lang, user, challengeStatuses, completeChallengeById, setScreen } = useApp()
   const tx = t[lang]
   const [confetti, setConfetti] = useState(false)
   const [modal, setModal] = useState<ModalData | null>(null)
@@ -45,9 +44,13 @@ export default function ChallengesScreen() {
 
   function handleTap(ch: ChallengeConfig) {
     const status = challengeStatuses[ch.id]
-    // ENS challenge: always show as in-progress (not completable in demo)
-    if (ch.special) return
     if (status !== 'available') return
+
+    // ENS challenge: navigate to profile where the real ENS lookup lives
+    if (ch.id === 'ens') {
+      setScreen('profile')
+      return
+    }
 
     setConfetti(true)
     setTimeout(() => setConfetti(false), 120)
@@ -116,15 +119,13 @@ export default function ChallengesScreen() {
                   ? '1.5px solid rgba(16,185,129,0.25)'
                   : isLocked
                   ? '1.5px solid #F3F4F6'
-                  : ch.special
-                  ? '1.5px solid rgba(124,58,237,0.3)'
                   : '1.5px solid rgba(124,58,237,0.18)',
                 opacity: isLocked ? 0.55 : 1,
                 boxShadow: isActive ? '0 2px 12px rgba(124,58,237,0.10)' : '0 1px 4px rgba(0,0,0,0.04)',
                 transition: 'box-shadow 0.15s, opacity 0.15s',
                 cursor: isLocked ? 'default' : 'pointer',
               }}
-              className={isActive && !ch.special ? 'hover:shadow-md active:scale-[0.98]' : ''}
+              className={isActive ? 'hover:shadow-md active:scale-[0.98]' : ''}
             >
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
                 {/* Step number / emoji */}
@@ -176,8 +177,8 @@ export default function ChallengesScreen() {
                       +{ch.reward} USDC
                     </span>
 
-                    {/* ENS in-progress badge */}
-                    {ch.special && !isDone && ch.badgeKey && (
+                    {/* Optional badge (e.g. ENS "Ir a Perfil") */}
+                    {!isDone && ch.badgeKey && (
                       <span
                         style={{ fontSize: 11, fontWeight: 500, color: '#7C3AED', background: '#EDE9FE', borderRadius: 999, padding: '2px 10px' }}
                       >
@@ -193,8 +194,8 @@ export default function ChallengesScreen() {
                     )}
                   </div>
 
-                  {/* ENS note */}
-                  {ch.special && ch.noteKey && !isDone && (
+                  {/* Optional note */}
+                  {!isDone && ch.noteKey && (
                     <p style={{ fontSize: 11, color: '#7C3AED', marginTop: 6, lineHeight: 1.5, opacity: 0.85 }}>
                       {tx[ch.noteKey] as string}
                     </p>

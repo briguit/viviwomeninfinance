@@ -113,8 +113,8 @@ const RESPONSES: Record<string, Record<Lang, ViviResponse>> = {
     en: { text: "USDC (USD Coin) is a stable digital currency — always worth exactly $1. Unlike Bitcoin or Ethereum, it doesn't fluctuate. It's perfect for learning finance because you always know how much you have. With USDC in DeFi you can also earn yield without taking on volatility risk. Want to know how to use it?" },
   },
   ens: {
-    es: { text: 'ENS (Ethereum Name Service) es como el «DNS de la blockchain» — convierte las largas direcciones de Ethereum en nombres legibles como tuyo.vivi.eth. Con tu nombre ENS puedes recibir pagos en cripto, probar tu identidad en apps Web3 y representarte onchain, todo sin recordar ninguna dirección larga. Tu nombre .vivi.eth ya está registrado en Vivi. 🔑' },
-    en: { text: "ENS (Ethereum Name Service) is like the 'DNS of the blockchain' — it converts long Ethereum addresses into readable names like yours.vivi.eth. With your ENS name you can receive crypto payments, prove your identity in Web3 apps, and represent yourself onchain — all without remembering a long address. Your .vivi.eth name is already registered with Vivi. 🔑" },
+    es: { text: 'ENS (Ethereum Name Service) es el «DNS de la blockchain» — convierte largas direcciones de Ethereum en nombres legibles como vitalik.eth. Puedes explorar nombres ENS reales en tu perfil de Vivi: buscamos en Ethereum mainnet en tiempo real. Con un nombre ENS puedes recibir cripto, probar tu identidad en apps Web3 y representarte onchain. 🔑' },
+    en: { text: "ENS (Ethereum Name Service) is the 'DNS of the blockchain' — it converts long Ethereum addresses into readable names like vitalik.eth. You can explore real ENS names from your Vivi profile: we query Ethereum mainnet in real time. With an ENS name you can receive crypto, prove your identity in Web3 apps, and represent yourself onchain. 🔑" },
   },
   crypto: {
     es: { text: 'Importante distinguir: Bitcoin y Ethereum son activos volátiles — su precio puede subir o bajar mucho. USDC es diferente: es una stablecoin respaldada en reservas reales que siempre vale $1. Para aprender finanzas y empezar a ahorrar de forma segura, USDC es el mejor punto de partida. Cuando entiendas bien las bases, la volatilidad cripto tiene más sentido.' },
@@ -149,6 +149,7 @@ export async function getViviResponse(
   message: string,
   lang: Lang,
   country: string = 'MX',
+  ensName?: string | null,
 ): Promise<ViviResponse> {
   // Simulate network latency for a realistic feel
   await new Promise(r => setTimeout(r, 500 + Math.random() * 400))
@@ -156,6 +157,16 @@ export async function getViviResponse(
   const intent = detect(message)
 
   if (intent === 'fx') return buildFxResponse(country, lang)
+
+  // Personalized ENS response when the user's resolved name is known
+  if (intent === 'ens' && ensName) {
+    return {
+      text: lang === 'es'
+        ? `Tu identidad onchain es **${ensName}** ✓ — verificada en Ethereum mainnet por Vivi. ENS convierte la larga dirección de tu wallet en un nombre legible y único. Con él puedes recibir cripto, autenticarte en apps Web3 y representarte de forma permanente en la blockchain. 🔑`
+        : `Your onchain identity is **${ensName}** ✓ — verified on Ethereum mainnet by Vivi. ENS converts your long wallet address into a readable, unique name. With it you can receive crypto, authenticate in Web3 apps, and represent yourself permanently on-chain. 🔑`,
+    }
+  }
+
   if (RESPONSES[intent]) return RESPONSES[intent][lang]
 
   // Cycle through follow-ups without repeating

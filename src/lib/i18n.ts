@@ -71,8 +71,8 @@ export const t = {
     ch4_desc: 'Confirma que eres una persona real con World ID',
     ch5_title: 'Activa tu nombre .vivi.eth',
     ch5_desc: 'Tu identidad permanente en la blockchain',
-    ch5_badge: 'En progreso',
-    ch5_note: 'Tu nombre fue creado. Se activará en mainnet en el lanzamiento oficial.',
+    ch5_badge: 'Toca para ir a Perfil →',
+    ch5_note: 'Ve a tu perfil y explora cualquier nombre .eth para completar este reto en Ethereum mainnet.',
 
     // ── Perfil ──────────────────────────────────────────────────────────────────
     profile_balance: 'Balance USDC',
@@ -163,8 +163,8 @@ export const t = {
     ch4_desc: 'Confirm you are a real person with World ID',
     ch5_title: 'Activate your .vivi.eth name',
     ch5_desc: 'Your permanent blockchain identity',
-    ch5_badge: 'In progress',
-    ch5_note: 'Your name was created. It will activate on mainnet at official launch.',
+    ch5_badge: 'Tap to go to Profile →',
+    ch5_note: 'Go to your profile and explore any .eth name to complete this challenge on Ethereum mainnet.',
 
     // ── Profile ─────────────────────────────────────────────────────────────────
     profile_balance: 'USDC Balance',
