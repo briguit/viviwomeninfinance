@@ -107,7 +107,7 @@ export default function WithdrawModal({
             <>
               {/* Current vault balance */}
               {vaultBalance && (
-                <div style={{ background: '#F5F3FF', borderRadius: 14, padding: '12px 16px', display: 'flex', items: 'center', justifyContent: 'space-between' }}>
+                <div style={{ background: '#F5F3FF', borderRadius: 14, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <p style={{ fontSize: 11, color: '#7C3AED', fontWeight: 600, marginBottom: 2 }}>
                       {es ? 'Saldo disponible en vault' : 'Available vault balance'}
