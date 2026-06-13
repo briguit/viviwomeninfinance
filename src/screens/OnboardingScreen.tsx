@@ -8,14 +8,7 @@ import LanguageToggle from '@/components/LanguageToggle'
 import { Check, Shield, ChevronLeft, Mail, Lock, ArrowLeft } from 'lucide-react'
 
 // World ID — imported only when app_id is configured
-let IDKitWidget: React.ComponentType<IDKitProps> | null = null
-let VerificationLevel: Record<string, string> | null = null
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const wld = require('@worldcoin/idkit')
-  IDKitWidget = wld.IDKitWidget
-  VerificationLevel = wld.VerificationLevel
-} catch { /* package not installed */ }
+type IDKitModule = typeof import('@worldcoin/idkit')
 
 interface IDKitProps {
   app_id: string
@@ -130,6 +123,7 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
   const [worldLoading, setWorldLoading] = useState(false)
   const [worldVerified, setWorldVerified] = useState(false)
   const [worldError, setWorldError] = useState(false)
+  const [idKit, setIdKit] = useState<IDKitModule | null>(null)
 
   // When Privy auth completes, move to identity step
   useEffect(() => {
@@ -137,6 +131,14 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
       setStep('identity')
     }
   }, [auth.authenticated, step])
+
+  useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_WLD_APP_ID) return
+
+    void import('@worldcoin/idkit')
+      .then(setIdKit)
+      .catch(() => setIdKit(null))
+  }, [])
 
   // ── Login handlers ─────────────────────────────────────────────────────────
   async function handleSendCode(e: React.FormEvent) {
@@ -589,6 +591,9 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
   // WORLD ID (paso 3)
   // ══════════════════════════════════════════════════════════════════════════
   const wldAppId = process.env.NEXT_PUBLIC_WLD_APP_ID
+  const wldAction = process.env.NEXT_PUBLIC_WLD_ACTION ?? 'verify-human'
+  const IDKitWidget = idKit?.IDKitWidget
+  const VerificationLevel = idKit?.VerificationLevel
   const wldEnabled = !!(IDKitWidget && wldAppId)
   const isDemo = !wldEnabled
 
@@ -656,7 +661,7 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
           ) : wldEnabled && IDKitWidget ? (
             <IDKitWidget
               app_id={wldAppId as string}
-              action={process.env.WLD_ACTION ?? 'verify-human'}
+              action={wldAction}
               verification_level={VerificationLevel?.Device ?? 'device'}
               onSuccess={handleWorldIDSuccess}
             >

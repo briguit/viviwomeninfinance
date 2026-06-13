@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createPublicClient, http, formatUnits, isAddress } from 'viem'
-import { base } from 'viem/chains'
 
 const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as const
 
@@ -23,7 +22,6 @@ export async function GET(req: NextRequest) {
 
   try {
     const client = createPublicClient({
-      chain: base,
       transport: http('https://base.publicnode.com'),
     })
 

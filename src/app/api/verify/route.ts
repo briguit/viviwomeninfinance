@@ -4,7 +4,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 // Docs: https://docs.worldcoin.org/id/cloud-verification
 export async function POST(req: NextRequest) {
   const appId = process.env.NEXT_PUBLIC_WLD_APP_ID
-  const action = process.env.WLD_ACTION ?? 'verify-human'
+  const action = process.env.WLD_ACTION ?? process.env.NEXT_PUBLIC_WLD_ACTION ?? 'verify-human'
 
   if (!appId) {
     return NextResponse.json({ success: false, error: 'WLD_APP_ID not configured' }, { status: 500 })
