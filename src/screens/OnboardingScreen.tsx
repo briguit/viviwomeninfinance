@@ -176,8 +176,13 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
         {/* Content — padded sides, centered */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 24px 24px' }}>
 
-          {/* Logo */}
-          <img src="/vivi-logo.svg" alt="Vivi" style={{ height: 44, width: 'auto', marginBottom: 28 }} />
+          {/* Logo — centrado y prominente */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 32 }}>
+            <img src="/vivi-logo.svg" alt="Vivi" style={{ height: 86, width: 86, marginBottom: 8 }} />
+            <span style={{ fontSize: 36, fontWeight: 700, color: '#7C3AED', letterSpacing: '0.01em', fontFamily: "'Poppins', 'Nunito', sans-serif" }}>
+              Vivi
+            </span>
+          </div>
 
           {/* Headline */}
           <h1
