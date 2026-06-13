@@ -166,83 +166,83 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
     const f = 'Manrope, Verdana, Arial, sans-serif'
     return (
       <div
-        className="app-shell flex flex-col"
-        style={{ background: '#fef7ff', height: '100dvh' }}
+        className="app-shell"
+        style={{ background: '#f8f9ff', height: '100dvh', position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
       >
-        {/* Language toggle */}
-        <div className="flex justify-end px-5 pt-10 flex-shrink-0">
-          <LanguageToggle />
+        {/* Ambient glow blobs */}
+        <div style={{ position: 'absolute', top: '-10%', left: '-10%', width: '55%', height: '55%', borderRadius: '50%', background: '#fea619', opacity: 0.12, filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
+        <div style={{ position: 'absolute', bottom: '-10%', right: '-10%', width: '65%', height: '65%', borderRadius: '50%', background: '#d2bbff', opacity: 0.18, filter: 'blur(100px)', pointerEvents: 'none', zIndex: 0 }} />
+
+        {/* ── Hero (55%) ─────────────────────────────────────────────────── */}
+        <div style={{
+          position: 'relative', flexGrow: 0, flexBasis: '55%',
+          background: '#eff4ff',
+          clipPath: 'polygon(0 0, 100% 0, 100% 85%, 0% 100%)',
+          overflow: 'hidden',
+          boxShadow: '0 4px 24px rgba(76,29,149,0.08)',
+          zIndex: 1,
+        }}>
+          {/* V mark — decorative, right side */}
+          <div style={{ position: 'absolute', right: -20, top: '50%', transform: 'translateY(-55%)', opacity: 0.55 }}>
+            <img src="/vivi-logo.svg" alt="" style={{ height: 200, width: 200 }} />
+          </div>
+          {/* Soft circle left */}
+          <div style={{ position: 'absolute', left: -40, bottom: -20, width: 240, height: 240, borderRadius: '50%', background: 'rgba(99,14,212,0.06)' }} />
+          {/* Gradient overlay bottom */}
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(239,244,255,0.9) 0%, transparent 60%)' }} />
+          {/* Language toggle */}
+          <div style={{ position: 'absolute', top: 48, right: 20, zIndex: 20 }}>
+            <LanguageToggle glass />
+          </div>
         </div>
 
-        {/* Content */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 20px 32px' }}>
-
-          {/* Logo */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 40 }}>
-            <img src="/vivi-logo.svg" alt="Vivi" style={{ height: 88, width: 88, marginBottom: 12 }} />
-            <span style={{ fontFamily: f, fontSize: 40, fontWeight: 800, color: '#7C3AED', letterSpacing: '-0.02em', lineHeight: 1 }}>
-              Vivi
-            </span>
+        {/* ── Content (45%) ──────────────────────────────────────────────── */}
+        <div style={{
+          flexGrow: 1, background: '#ffffff',
+          display: 'flex', flexDirection: 'column',
+          padding: '0 20px', zIndex: 1,
+        }}>
+          <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 12 }}>
+            {/* Brand mark */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <img src="/vivi-logo.svg" alt="Vivi" style={{ height: 44, width: 44 }} />
+              <span style={{ fontFamily: f, fontSize: 26, fontWeight: 800, color: '#7C3AED', letterSpacing: '-0.02em', lineHeight: 1 }}>Vivi</span>
+            </div>
+            {/* Headline */}
+            <h2 style={{ fontFamily: f, fontSize: 28, fontWeight: 700, lineHeight: '36px', color: '#121c2a', whiteSpace: 'pre-line', margin: 0 }}>
+              {tx.splash_headline}
+            </h2>
+            {/* Subtitle */}
+            <p style={{ fontFamily: f, fontSize: 16, fontWeight: 400, lineHeight: '24px', color: '#4a4455', maxWidth: 300, margin: 0 }}>
+              {tx.splash_sub}
+            </p>
           </div>
 
-          {/* Headline — display-lg mobile spec */}
-          <h1 style={{
-            fontFamily: f, fontSize: 28, fontWeight: 700,
-            lineHeight: '36px', letterSpacing: '-0.01em',
-            color: '#1d1a24', marginBottom: 12, whiteSpace: 'pre-line',
-          }}>
-            {tx.splash_headline}
-          </h1>
-
-          {/* Sub — body-md spec */}
-          <p style={{
-            fontFamily: f, fontSize: 16, fontWeight: 400,
-            lineHeight: '24px', color: '#4a4455', marginBottom: 32,
-          }}>
-            {tx.splash_sub}
-          </p>
-
-          {/* Feature chips — pill with lavender bg + violet label */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 40 }}>
-            {[
-              { icon: '💬', text: tx.splash_feat1 },
-              { icon: '🎯', text: tx.splash_feat2 },
-              { icon: '🔑', text: tx.splash_feat3 },
-            ].map(({ icon, text }) => (
-              <div key={text} style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                background: '#ede9fe', borderRadius: 9999, padding: '10px 16px',
-              }}>
-                <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0 }}>{icon}</span>
-                <span style={{ fontFamily: f, fontSize: 14, fontWeight: 600, color: '#7C3AED', lineHeight: '20px' }}>
-                  {text}
-                </span>
-              </div>
-            ))}
+          {/* Action area */}
+          <div style={{ paddingBottom: 32, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <button
+              onClick={auth.login}
+              style={{
+                width: '100%', height: 56, background: '#630ed4', color: '#fff',
+                fontFamily: f, fontSize: 14, fontWeight: 600, letterSpacing: '0.01em',
+                borderRadius: 12, boxShadow: '0 8px 24px rgba(124,58,237,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+              className="transition-all active:scale-95"
+            >
+              {tx.splash_cta} <span style={{ fontSize: 18, lineHeight: 1 }}>→</span>
+            </button>
+            <div style={{ textAlign: 'center' }}>
+              <button
+                onClick={auth.login}
+                style={{ fontFamily: f, fontSize: 14, fontWeight: 600, color: '#630ed4', background: 'none', padding: '8px 0' }}
+                className="transition-colors active:scale-95"
+              >
+                {tx.splash_login}
+              </button>
+            </div>
           </div>
-
-          {/* Primary CTA */}
-          <button
-            onClick={auth.login}
-            style={{
-              width: '100%', height: 56, borderRadius: 16,
-              background: '#7C3AED', color: '#fff',
-              fontFamily: f, fontSize: 16, fontWeight: 600,
-              boxShadow: '0 8px 24px rgba(124,58,237,0.25)',
-              marginBottom: 16, letterSpacing: '0.01em',
-            }}
-            className="transition-all active:scale-95"
-          >
-            {tx.splash_cta} →
-          </button>
-
-          {/* Secondary */}
-          <button
-            onClick={auth.login}
-            style={{ fontFamily: f, fontSize: 14, fontWeight: 600, color: '#4a4455', background: 'none', textAlign: 'center' }}
-          >
-            {tx.splash_login}
-          </button>
+          <div style={{ height: 32 }} />
         </div>
       </div>
     )

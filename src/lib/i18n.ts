@@ -1,13 +1,13 @@
 export const t = {
   es: {
     // ── Splash ──────────────────────────────────────────────────────────────────
-    splash_headline: 'Aprende finanzas.\nGana recompensas reales.',
-    splash_sub: 'Tu mentora financiera personal. Gratis, sin bancos, en tu idioma.',
+    splash_headline: 'Bienvenida a un futuro\nfinanciero brillante.',
+    splash_sub: 'Tu mentora financiera bilingüe para un camino seguro y confiado.',
     splash_feat1: 'Aprende sobre dinero en lenguaje simple',
     splash_feat2: 'Completa retos y gana USDC de verdad',
     splash_feat3: 'Crea tu identidad .vivi.eth en blockchain',
-    splash_cta: 'Comenzar gratis',
-    splash_login: 'Ya tengo cuenta',
+    splash_cta: 'Comenzar con Vivi',
+    splash_login: 'Iniciar sesión con cuenta existente',
 
     // ── Registro ────────────────────────────────────────────────────────────────
     register_title: '¿Cuál es tu email?',
@@ -93,13 +93,13 @@ export const t = {
 
   en: {
     // ── Splash ──────────────────────────────────────────────────────────────────
-    splash_headline: 'Learn personal finance.\nEarn real rewards.',
-    splash_sub: 'Your personal financial mentor. Free, no banks, in your language.',
+    splash_headline: 'Welcome to a brilliant\nfinancial future.',
+    splash_sub: 'Your bilingual financial mentor for a safe and confident journey.',
     splash_feat1: 'Learn about money in plain language',
     splash_feat2: 'Complete challenges and earn real USDC',
     splash_feat3: 'Build your .vivi.eth identity onchain',
-    splash_cta: 'Start for free',
-    splash_login: 'I already have an account',
+    splash_cta: 'Get started with Vivi',
+    splash_login: 'Sign in with existing account',
 
     // ── Register ────────────────────────────────────────────────────────────────
     register_title: "What's your email?",
