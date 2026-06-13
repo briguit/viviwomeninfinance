@@ -5,7 +5,7 @@ import { t } from '@/lib/i18n'
 import LanguageToggle from '@/components/LanguageToggle'
 import { ExternalLink, Shield, Star, Award, LogOut, ChevronDown, ChevronUp, TrendingUp, Zap, Copy, Check, Search } from 'lucide-react'
 import { COUNTRY_FLAGS, COUNTRIES_LIST } from '@/lib/countryData'
-import { getEnsProfile, resolveEnsName, type EnsProfile } from '@/lib/ens'
+import { getEnsProfile, resolveEnsName, type EnsProfile, type EnsLookupResult } from '@/lib/ens'
 
 export default function ProfileScreen() {
   const { lang, user, handleLogout, walletAddress, walletCreating, auth, completeChallengeById, challengeStatuses } = useApp()
@@ -25,7 +25,7 @@ export default function ProfileScreen() {
   const [ensProfile, setEnsProfile]             = useState<EnsProfile | null>(null)
   const [ensLoading, setEnsLoading]             = useState(false)
   const [ensLookupQuery, setEnsLookupQuery]     = useState('')
-  const [ensLookupResult, setEnsLookupResult]   = useState<{ name: string; address: string | null } | null>(null)
+  const [ensLookupResult, setEnsLookupResult]   = useState<(EnsLookupResult & { name: string }) | null>(null)
   const [ensLookupLoading, setEnsLookupLoading] = useState(false)
   const [ensJustCompleted, setEnsJustCompleted] = useState(false)
 
@@ -136,17 +136,19 @@ export default function ProfileScreen() {
   async function handleEnsLookup() {
     const raw = ensLookupQuery.trim()
     if (!raw) return
-    const name = raw.includes('.') ? raw : `${raw}.eth`
+    const name = raw.includes('.') ? raw.toLowerCase() : `${raw.toLowerCase()}.eth`
     setEnsLookupLoading(true)
     setEnsLookupResult(null)
     try {
-      const address = await resolveEnsName(name)
-      setEnsLookupResult({ name, address })
-      if (address && userId) localStorage.setItem(`vivi_ens_${userId}`, name)
-      // Complete ENS challenge on first successful lookup
-      if (address && challengeStatuses['ens'] === 'available') {
-        completeChallengeById('ens', 20)
-        setEnsJustCompleted(true)
+      const result = await resolveEnsName(name)
+      setEnsLookupResult({ ...result, name })
+      if (result.status === 'resolved') {
+        if (userId) localStorage.setItem(`vivi_ens_${userId}`, name)
+        // Complete ENS challenge on first successful lookup
+        if (challengeStatuses['ens'] === 'available') {
+          completeChallengeById('ens', 20)
+          setEnsJustCompleted(true)
+        }
       }
     } finally {
       setEnsLookupLoading(false)
@@ -556,14 +558,20 @@ export default function ProfileScreen() {
               </button>
             </div>
 
-            {/* Lookup result */}
+            {/* Lookup result — typed status prevents "not registered" on RPC errors */}
             {ensLookupResult && (
               <div style={{
                 marginTop: 8, padding: '10px 12px', borderRadius: 8,
-                background: ensLookupResult.address ? '#F0FDF4' : '#FEF2F2',
-                border: `1px solid ${ensLookupResult.address ? '#BBF7D0' : '#FECACA'}`,
+                background: ensLookupResult.status === 'resolved' ? '#F0FDF4'
+                  : ensLookupResult.status === 'rpc_error' ? '#FFFBEB'
+                  : '#FEF2F2',
+                border: `1px solid ${
+                  ensLookupResult.status === 'resolved' ? '#BBF7D0'
+                  : ensLookupResult.status === 'rpc_error' ? '#FDE68A'
+                  : '#FECACA'
+                }`,
               }}>
-                {ensLookupResult.address ? (
+                {ensLookupResult.status === 'resolved' ? (
                   <>
                     <p style={{ fontSize: 13, fontWeight: 600, color: '#16A34A' }}>
                       ✓ {ensLookupResult.name}
@@ -582,9 +590,17 @@ export default function ProfileScreen() {
                       {lang === 'es' ? 'Ver en ENS App ↗' : 'View on ENS App ↗'}
                     </a>
                   </>
+                ) : ensLookupResult.status === 'rpc_error' ? (
+                  <p style={{ fontSize: 13, color: '#92400E' }}>
+                    {lang === 'es'
+                      ? 'Error de red al consultar ENS. Intenta de nuevo.'
+                      : 'Network error querying ENS. Please try again.'}
+                  </p>
                 ) : (
                   <p style={{ fontSize: 13, color: '#DC2626' }}>
-                    {lang === 'es' ? `"${ensLookupResult.name}" no está registrado` : `"${ensLookupResult.name}" is not registered`}
+                    {lang === 'es'
+                      ? `"${ensLookupResult.name}" no está registrado en ENS`
+                      : `"${ensLookupResult.name}" is not registered in ENS`}
                   </p>
                 )}
               </div>

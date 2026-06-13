@@ -1,7 +1,10 @@
 /**
  * ENS integration — real Ethereum mainnet resolution via viem.
- * Used for: reverse lookup, forward resolution, avatar, text records.
- * No API key required; uses public RPC endpoints.
+ * RPC: ethereum.publicnode.com (free, no key, supports CCIP-Read for Universal Resolver).
+ *
+ * Tested working: vitalik.eth, nick.eth, ens.eth + reverse lookups.
+ * eth.llamarpc.com was the original RPC but returns 403 (Cloudflare challenge) from Node.js.
+ * cloudflare-eth.com and rpc.ankr.com/eth reject CCIP-Read calls used by viem v2 ENS.
  */
 import { createPublicClient, http } from 'viem'
 import { mainnet } from 'viem/chains'
@@ -13,19 +16,24 @@ export interface EnsProfile {
   description: string | null
   twitter: string | null
   url: string | null
-  validated: boolean // true = name forward-resolves back to the queried address
+  validated: boolean
 }
 
-// Public mainnet RPC — no API key needed for ENS read-only calls
+/** Three distinct outcomes so the UI never lies. */
+export type EnsLookupResult =
+  | { status: 'resolved'; address: string }
+  | { status: 'not_found' }           // name exists but has no addr record (rare) or is unregistered
+  | { status: 'rpc_error'; message: string }
+
 const client = createPublicClient({
   chain: mainnet,
-  transport: http('https://eth.llamarpc.com'),
+  transport: http('https://ethereum.publicnode.com'),
 })
 
 /**
- * Reverse-lookup a wallet address to its ENS primary name.
- * Then forward-validates: the resolved name must map back to the same address.
- * This prevents spoofed reverse records.
+ * Reverse-lookup an address → ENS primary name, then forward-validates.
+ * Prevents accepting spoofed reverse records.
+ * Returns null for no name OR on any RPC error (safe to display as "no name").
  */
 export async function lookupEnsName(address: string): Promise<string | null> {
   try {
@@ -39,17 +47,32 @@ export async function lookupEnsName(address: string): Promise<string | null> {
   }
 }
 
-/** Forward-resolve an ENS name to its address. Returns null if unregistered. */
-export async function resolveEnsName(name: string): Promise<string | null> {
+/**
+ * Forward-resolve an ENS name to its address.
+ * Returns a typed result distinguishing "not found" from "RPC/resolver error"
+ * so the UI never incorrectly says "not registered" when the RPC failed.
+ */
+export async function resolveEnsName(name: string): Promise<EnsLookupResult> {
+  const normalized = name.trim().toLowerCase()
+  const withSuffix = normalized.endsWith('.eth') ? normalized : `${normalized}.eth`
   try {
-    const address = await client.getEnsAddress({ name: normalize(name) })
-    return address ?? null
-  } catch {
-    return null
+    const address = await client.getEnsAddress({ name: normalize(withSuffix) })
+    if (address) return { status: 'resolved', address }
+    return { status: 'not_found' }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    // Distinguish real "not registered" from infra errors
+    // viem throws ContractFunctionZeroDataError when there is no resolver (= not registered)
+    const isNotRegistered =
+      msg.includes('returned no data') ||
+      msg.includes('ContractFunctionZero') ||
+      msg.includes('no data')
+    if (isNotRegistered) return { status: 'not_found' }
+    return { status: 'rpc_error', message: msg.slice(0, 120) }
   }
 }
 
-/** Fetch ENS avatar URI (may be IPFS, HTTP, or token URI). */
+/** Fetch ENS avatar URI. Returns null on missing record or error. */
 export async function getEnsAvatar(name: string): Promise<string | null> {
   try {
     const avatar = await client.getEnsAvatar({ name: normalize(name) })
