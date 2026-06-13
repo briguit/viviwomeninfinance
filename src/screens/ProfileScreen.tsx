@@ -1,19 +1,41 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useApp } from '@/context/AppContext'
 import { t } from '@/lib/i18n'
 import LanguageToggle from '@/components/LanguageToggle'
-import { ExternalLink, Shield, Star, Award, LogOut, ChevronDown, ChevronUp, TrendingUp, Zap } from 'lucide-react'
+import { ExternalLink, Shield, Star, Award, LogOut, ChevronDown, ChevronUp, TrendingUp, Zap, Copy, Check } from 'lucide-react'
 import { COUNTRY_FLAGS, COUNTRIES_LIST } from '@/lib/countryData'
 
 export default function ProfileScreen() {
-  const { lang, user, handleLogout, walletAddress } = useApp()
+  const { lang, user, handleLogout, walletAddress, auth } = useApp()
   const tx = t[lang]
   const [confirmLogout, setConfirmLogout] = useState(false)
   const [showWallet, setShowWallet] = useState(false)
-  const [earnLoading, setEarnLoading] = useState(false)
-  const [earnSuccess, setEarnSuccess] = useState(false)
-  const [earnError, setEarnError] = useState('')
+
+  // Earn state
+  const [savingsWalletId, setSavingsWalletId]       = useState<string | null>(null)
+  const [savingsWalletAddr, setSavingsWalletAddr]   = useState<string | null>(null)
+  const [savingsLoading, setSavingsLoading]         = useState(false)
+  const [savingsError, setSavingsError]             = useState('')
+  const [depositLoading, setDepositLoading]         = useState(false)
+  const [depositSuccess, setDepositSuccess]         = useState(false)
+  const [depositError, setDepositError]             = useState('')
+  const [copied, setCopied]                         = useState(false)
+
+  const userId = auth.userId
+
+  // Load stored savings wallet from localStorage on mount
+  useEffect(() => {
+    if (!userId) return
+    const stored = localStorage.getItem(`vivi_savings_${userId}`)
+    if (stored) {
+      try {
+        const { walletId, walletAddress: addr } = JSON.parse(stored) as { walletId: string; walletAddress: string }
+        setSavingsWalletId(walletId)
+        setSavingsWalletAddr(addr)
+      } catch { /* ignore */ }
+    }
+  }, [userId])
 
   if (!user) return null
 
@@ -22,27 +44,65 @@ export default function ProfileScreen() {
   const initial      = user.name.charAt(0).toUpperCase()
   const ensUrl       = `https://app.ens.domains/${user.viviEns}`
 
-  async function handleEarnDeposit() {
-    if (!walletAddress) return
-    setEarnLoading(true)
-    setEarnError('')
+  // Step 1: Create a Privy server wallet (different from embedded wallet — no user keys)
+  async function handleCreateSavingsWallet() {
+    setSavingsLoading(true)
+    setSavingsError('')
+    try {
+      const res = await fetch('/api/earn/savings-wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      })
+      const data = await res.json() as { success: boolean; walletId?: string; walletAddress?: string; message?: string }
+      if (data.success && data.walletId && data.walletAddress) {
+        setSavingsWalletId(data.walletId)
+        setSavingsWalletAddr(data.walletAddress)
+        if (userId) {
+          localStorage.setItem(`vivi_savings_${userId}`, JSON.stringify({
+            walletId: data.walletId,
+            walletAddress: data.walletAddress,
+          }))
+        }
+      } else {
+        setSavingsError(data.message ?? (lang === 'es' ? 'No se pudo crear el savings wallet.' : 'Could not create savings wallet.'))
+      }
+    } catch {
+      setSavingsError(lang === 'es' ? 'Error de conexión.' : 'Connection error.')
+    } finally {
+      setSavingsLoading(false)
+    }
+  }
+
+  // Step 2: Deposit to Privy Earn vault using the server wallet ID
+  async function handleDeposit() {
+    if (!savingsWalletId) return
+    setDepositLoading(true)
+    setDepositError('')
     try {
       const res = await fetch('/api/earn/deposit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress, amount: '1.00' }),
+        body: JSON.stringify({ walletId: savingsWalletId, amount: '1.00' }),
       })
-      const data = await res.json() as { success: boolean; message?: string }
+      const data = await res.json() as { success: boolean; message?: string; status?: string }
       if (data.success) {
-        setEarnSuccess(true)
+        setDepositSuccess(true)
       } else {
-        setEarnError(data.message ?? 'Error')
+        setDepositError(data.message ?? 'Error')
       }
     } catch {
-      setEarnError(lang === 'es' ? 'No se pudo conectar. Intenta de nuevo.' : 'Could not connect. Try again.')
+      setDepositError(lang === 'es' ? 'Error de conexión.' : 'Connection error.')
     } finally {
-      setEarnLoading(false)
+      setDepositLoading(false)
     }
+  }
+
+  function copyAddress() {
+    if (!savingsWalletAddr) return
+    navigator.clipboard.writeText(savingsWalletAddr)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   // Badges based on progress
@@ -157,52 +217,113 @@ export default function ProfileScreen() {
             boxShadow: '0 4px 20px rgba(6,95,70,0.20)',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <TrendingUp size={16} style={{ color: '#6EE7B7' }} />
-            <p style={{ fontSize: 12, color: '#6EE7B7', fontWeight: 600 }}>
-              {lang === 'es' ? 'PRIVY EARN · Morpho USDC Vault · Base' : 'PRIVY EARN · Morpho USDC Vault · Base'}
+            <p style={{ fontSize: 12, color: '#6EE7B7', fontWeight: 600, letterSpacing: '0.03em' }}>
+              PRIVY EARN · Morpho USDC Vault · Base
             </p>
           </div>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.75)', lineHeight: 1.5, marginBottom: 14 }}>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.70)', lineHeight: 1.5, marginBottom: 16 }}>
             {lang === 'es'
-              ? 'Gana ~4–6% APY en tu USDC a través de vaults ERC-4626 de Morpho en Base. Powered by Privy Earn.'
-              : 'Earn ~4–6% APY on your USDC via Morpho ERC-4626 vaults on Base. Powered by Privy Earn.'}
+              ? 'Gana ~4–6% APY depositando USDC en vaults ERC-4626 de Morpho en Base.'
+              : 'Earn ~4–6% APY depositing USDC into Morpho ERC-4626 vaults on Base.'}
           </p>
 
-          {earnSuccess ? (
-            <div style={{ background: 'rgba(110,231,183,0.15)', borderRadius: 12, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Zap size={14} style={{ color: '#6EE7B7' }} />
-              <p style={{ fontSize: 13, color: '#6EE7B7', fontWeight: 500 }}>
-                {lang === 'es' ? '¡Depósito enviado a Privy Earn! 🎉' : 'Deposit sent to Privy Earn! 🎉'}
+          {/* ── Estado 3: Depósito exitoso ── */}
+          {depositSuccess && (
+            <div style={{ background: 'rgba(110,231,183,0.18)', borderRadius: 12, padding: '14px', textAlign: 'center' }}>
+              <p style={{ fontSize: 22, marginBottom: 4 }}>🎉</p>
+              <p style={{ fontSize: 14, color: '#6EE7B7', fontWeight: 600 }}>
+                {lang === 'es' ? '¡Depósito enviado a Privy Earn!' : 'Deposit sent to Privy Earn!'}
+              </p>
+              <p style={{ fontSize: 12, color: 'rgba(110,231,183,0.7)', marginTop: 4 }}>
+                {lang === 'es' ? 'Tu USDC está generando yield en Morpho.' : 'Your USDC is earning yield on Morpho.'}
               </p>
             </div>
-          ) : (
-            <button
-              onClick={handleEarnDeposit}
-              disabled={earnLoading || !walletAddress}
-              style={{
-                width: '100%', height: 44, borderRadius: 12,
-                background: earnLoading ? 'rgba(255,255,255,0.15)' : '#10B981',
-                fontSize: 14, fontWeight: 600,
-                color: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                cursor: earnLoading || !walletAddress ? 'not-allowed' : 'pointer',
-                opacity: !walletAddress ? 0.6 : 1,
-              }}
-            >
-              {earnLoading ? (
-                <div style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-              ) : (
-                <>
-                  <Zap size={14} />
-                  {lang === 'es' ? 'Depositar 1 USDC y ganar yield' : 'Deposit 1 USDC & earn yield'}
-                </>
-              )}
-            </button>
           )}
 
-          {earnError && (
-            <p style={{ fontSize: 12, color: '#FCA5A5', marginTop: 8, textAlign: 'center' }}>{earnError}</p>
+          {/* ── Estado 2: Savings wallet creado — mostrar dirección + botón depositar ── */}
+          {!depositSuccess && savingsWalletId && savingsWalletAddr && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Savings wallet address */}
+              <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 12, padding: '12px 14px' }}>
+                <p style={{ fontSize: 10, color: 'rgba(110,231,183,0.7)', fontWeight: 600, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  {lang === 'es' ? 'Tu cuenta de ahorro (envía USDC aquí)' : 'Your savings account (send USDC here)'}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <p style={{ fontSize: 10, color: '#fff', fontFamily: 'monospace', flex: 1, wordBreak: 'break-all', lineHeight: 1.5 }}>
+                    {savingsWalletAddr}
+                  </p>
+                  <button
+                    onClick={copyAddress}
+                    style={{ flexShrink: 0, padding: '4px', background: 'none', color: copied ? '#6EE7B7' : 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
+                  >
+                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
+                </div>
+                <p style={{ fontSize: 10, color: 'rgba(110,231,183,0.6)', marginTop: 4 }}>
+                  ✓ Privy Server Wallet · Base (USDC)
+                </p>
+              </div>
+
+              {/* Deposit button */}
+              <button
+                onClick={handleDeposit}
+                disabled={depositLoading}
+                style={{
+                  width: '100%', height: 44, borderRadius: 12,
+                  background: depositLoading ? 'rgba(255,255,255,0.15)' : '#10B981',
+                  fontSize: 14, fontWeight: 600, color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  cursor: depositLoading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {depositLoading
+                  ? <div style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  : <><Zap size={14} />{lang === 'es' ? 'Depositar 1 USDC al vault' : 'Deposit 1 USDC to vault'}</>
+                }
+              </button>
+
+              {depositError && (
+                <p style={{ fontSize: 12, color: '#FCA5A5', textAlign: 'center', lineHeight: 1.5 }}>{depositError}</p>
+              )}
+            </div>
+          )}
+
+          {/* ── Estado 1: Sin savings wallet — botón para crear ── */}
+          {!depositSuccess && !savingsWalletId && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: 10, padding: '10px 14px' }}>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
+                  {lang === 'es'
+                    ? '① Crea tu cuenta de ahorro Privy → ② Envía USDC → ③ Gana yield automáticamente'
+                    : '① Create your Privy savings account → ② Send USDC → ③ Earn yield automatically'}
+                </p>
+              </div>
+
+              <button
+                onClick={handleCreateSavingsWallet}
+                disabled={savingsLoading}
+                style={{
+                  width: '100%', height: 44, borderRadius: 12,
+                  background: savingsLoading ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.15)',
+                  border: '1.5px solid rgba(110,231,183,0.5)',
+                  fontSize: 14, fontWeight: 600, color: '#6EE7B7',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  cursor: savingsLoading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {savingsLoading
+                  ? <div style={{ width: 18, height: 18, border: '2px solid rgba(110,231,183,0.3)', borderTopColor: '#6EE7B7', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  : <><TrendingUp size={14} />{lang === 'es' ? 'Crear cuenta de ahorro' : 'Create savings account'}</>
+                }
+              </button>
+
+              {savingsError && (
+                <p style={{ fontSize: 12, color: '#FCA5A5', textAlign: 'center' }}>{savingsError}</p>
+              )}
+            </div>
           )}
         </div>
 
