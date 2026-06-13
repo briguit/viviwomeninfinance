@@ -25,14 +25,6 @@ export async function POST(req: NextRequest) {
     }, { status: 400 })
   }
 
-  // Privy Earn API requires the Privy server wallet ID (e.g. "wallet:abc123"), not an Ethereum address.
-  if (!walletId.startsWith('wallet:')) {
-    return NextResponse.json({
-      success: false,
-      message: 'ID de wallet inválido. Usa el Privy server wallet ID (formato wallet:xxx) de /api/earn/savings-wallet.',
-    }, { status: 400 })
-  }
-
   const credentials = Buffer.from(`${appId}:${appSecret}`).toString('base64')
 
   const privyRes = await fetch(
