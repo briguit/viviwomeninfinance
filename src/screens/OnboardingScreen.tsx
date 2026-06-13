@@ -1,0 +1,464 @@
+'use client'
+import { useState, useRef } from 'react'
+import { useApp } from '@/context/AppContext'
+import { t } from '@/lib/i18n'
+import { COUNTRIES_LIST } from '@/lib/countryData'
+import LanguageToggle from '@/components/LanguageToggle'
+import { Check, Shield, ChevronLeft } from 'lucide-react'
+
+// World ID — imported only when app_id is configured
+let IDKitWidget: React.ComponentType<IDKitProps> | null = null
+let VerificationLevel: Record<string, string> | null = null
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const wld = require('@worldcoin/idkit')
+  IDKitWidget = wld.IDKitWidget
+  VerificationLevel = wld.VerificationLevel
+} catch { /* package not installed */ }
+
+interface IDKitProps {
+  app_id: string
+  action: string
+  verification_level?: string
+  onSuccess: (proof: WorldIDProof) => void
+  children: (props: { open: () => void }) => React.ReactNode
+}
+
+interface WorldIDProof {
+  proof: string
+  merkle_root: string
+  nullifier_hash: string
+  verification_level: string
+}
+
+type Step = 'splash' | 'register' | 'identity' | 'worldid'
+
+// ── Progress bar ──────────────────────────────────────────────────────────────
+const STEPS: Step[] = ['register', 'identity', 'worldid']
+function ProgressBar({ step }: { step: Step }) {
+  const idx = STEPS.indexOf(step)
+  if (idx < 0) return null
+  return (
+    <div className="flex gap-1.5 mb-7">
+      {STEPS.map((_, i) => (
+        <div
+          key={i}
+          className="h-1 rounded-full flex-1 transition-all duration-300"
+          style={{ background: i <= idx ? '#7C3AED' : '#E5E1FF' }}
+        />
+      ))}
+    </div>
+  )
+}
+
+// ── Card shell for steps 1–3 ──────────────────────────────────────────────────
+function StepCard({
+  children, step, onBack,
+}: {
+  children: React.ReactNode
+  step: Step
+  onBack?: () => void
+}) {
+  return (
+    <div
+      className="app-shell flex flex-col"
+      style={{ background: '#F8F7FF', height: '100dvh', overflow: 'hidden' }}
+    >
+      {/* Top bar */}
+      <div className="flex items-center justify-between px-5 pt-10 pb-3 flex-shrink-0">
+        {onBack ? (
+          <button
+            onClick={onBack}
+            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-vivi-lila transition-colors"
+          >
+            <ChevronLeft size={20} className="text-vivi-deep" />
+          </button>
+        ) : <div className="w-9" />}
+        <LanguageToggle />
+      </div>
+
+      {/* Centred card with flex spacers */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+        <div style={{ flex: 1, minHeight: 20 }} />
+        <div className="px-5">
+          <div style={{ background: '#fff', borderRadius: 24, padding: 28, boxShadow: '0 4px 24px rgba(45,27,78,0.08)' }}>
+            <ProgressBar step={step} />
+            {children}
+          </div>
+        </div>
+        <div style={{ flex: 1, minHeight: 28 }} />
+      </div>
+    </div>
+  )
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+interface Props { startAtIdentity?: boolean }
+
+export default function OnboardingScreen({ startAtIdentity = false }: Props) {
+  const { lang, auth, saveAndSetUser } = useApp()
+  const tx = t[lang]
+
+  const [step, setStep] = useState<Step>(startAtIdentity ? 'identity' : 'splash')
+  const [email, setEmail] = useState('')
+  const [registerLoading, setRegisterLoading] = useState(false)
+  const [name, setName] = useState('')
+
+  // BUG 2 fix: ref tracks the current value for use in closures
+  const [country, setCountry] = useState('MX')
+  const countryRef = useRef('MX')
+  function updateCountry(val: string) { countryRef.current = val; setCountry(val) }
+
+  const [worldLoading, setWorldLoading] = useState(false)
+  const [worldVerified, setWorldVerified] = useState(false)
+  const [worldError, setWorldError] = useState(false)
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
+  function handleRegister() {
+    if (!email.includes('@')) return
+    setRegisterLoading(true)
+    setTimeout(() => {
+      auth.login(email)
+      setRegisterLoading(false)
+      setStep('identity')
+    }, 1800)
+  }
+
+  function handleIdentity() {
+    if (!name.trim()) return
+    setStep('worldid')
+  }
+
+  async function handleWorldIDSuccess(proof: WorldIDProof) {
+    setWorldLoading(true)
+    setWorldError(false)
+    try {
+      const res = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(proof),
+      })
+      const data = await res.json() as { success: boolean }
+      if (data.success) {
+        setWorldVerified(true)
+        setWorldLoading(false)
+      } else throw new Error('not verified')
+    } catch {
+      setWorldLoading(false)
+      setWorldError(true)
+    }
+  }
+
+  function finish(verified: boolean) {
+    const currentCountry = countryRef.current
+    const trimmedName = name.trim()
+    saveAndSetUser({
+      name: trimmedName,
+      viviEns: `${trimmedName.toLowerCase().replace(/\s+/g, '')}.vivi.eth`,
+      country: currentCountry,
+      worldIdVerified: verified,
+      usdcBalance: 5.0,
+      points: 0,
+      level: 1,
+      challengesCompleted: 0,
+    })
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SPLASH
+  // ══════════════════════════════════════════════════════════════════════════
+  if (step === 'splash') {
+    return (
+      <div
+        className="app-shell flex flex-col"
+        style={{ background: '#F8F7FF', height: '100dvh' }}
+      >
+        {/* Language toggle – top right */}
+        <div className="flex justify-end px-5 pt-10 flex-shrink-0">
+          <LanguageToggle />
+        </div>
+
+        {/* Content — padded sides, centered */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 24px 24px' }}>
+
+          {/* Logo */}
+          <img src="/vivi-logo.svg" alt="Vivi" style={{ height: 44, width: 'auto', marginBottom: 28 }} />
+
+          {/* Headline */}
+          <h1
+            className="font-bold text-vivi-deep leading-tight"
+            style={{ fontSize: 30, marginBottom: 10, whiteSpace: 'pre-line' }}
+          >
+            {tx.splash_headline}
+          </h1>
+
+          {/* Sub */}
+          <p className="text-vivi-gray" style={{ fontSize: 15, lineHeight: 1.6, marginBottom: 28 }}>
+            {tx.splash_sub}
+          </p>
+
+          {/* Feature list */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 32 }}>
+            {[
+              { icon: '💬', text: tx.splash_feat1 },
+              { icon: '🎯', text: tx.splash_feat2 },
+              { icon: '🔑', text: tx.splash_feat3 },
+            ].map(({ icon, text }) => (
+              <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{icon}</span>
+                <span style={{ fontSize: 14, color: '#374151', lineHeight: 1.4 }}>{text}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* CTA */}
+          <button
+            onClick={() => setStep('register')}
+            className="w-full font-semibold text-white transition-all active:scale-95"
+            style={{
+              height: 52, borderRadius: 16,
+              background: '#7C3AED',
+              fontSize: 16,
+              boxShadow: '0 8px 24px rgba(124,58,237,0.30)',
+              marginBottom: 14,
+            }}
+          >
+            {tx.splash_cta} →
+          </button>
+
+          {/* Secondary */}
+          <button
+            onClick={() => setStep('register')}
+            className="text-vivi-gray text-sm text-center hover:text-vivi-purple transition-colors"
+          >
+            {tx.splash_login}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // REGISTER (paso 1)
+  // ══════════════════════════════════════════════════════════════════════════
+  if (step === 'register') {
+    return (
+      <StepCard step="register" onBack={() => setStep('splash')}>
+        <div style={{ marginBottom: 20 }}>
+          <h2 className="font-semibold text-vivi-deep" style={{ fontSize: 22, lineHeight: 1.3, marginBottom: 6 }}>
+            {tx.register_title}
+          </h2>
+          <p className="text-vivi-gray" style={{ fontSize: 14 }}>{tx.register_sub}</p>
+        </div>
+
+        {registerLoading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '24px 0' }}>
+            <div className="w-9 h-9 border-4 border-vivi-lila border-t-vivi-purple rounded-full animate-spin" />
+            <p className="text-vivi-purple font-medium text-sm text-center">{tx.register_loading}</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <input
+              type="email"
+              value={email}
+              autoFocus
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleRegister()}
+              placeholder={tx.register_placeholder}
+              style={{ height: 52, borderRadius: 14, border: '1.5px solid #E5E1FF', padding: '0 16px', fontSize: 15, outline: 'none', width: '100%' }}
+              className="text-vivi-deep bg-white focus:border-vivi-purple transition-colors"
+            />
+            <button
+              onClick={handleRegister}
+              disabled={!email.includes('@')}
+              style={{ height: 52, borderRadius: 14, background: '#7C3AED', fontSize: 15 }}
+              className="w-full text-white font-semibold disabled:opacity-40 transition-all active:scale-95"
+            >
+              {tx.register_cta}
+            </button>
+          </div>
+        )}
+      </StepCard>
+    )
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // IDENTITY (paso 2)
+  // ══════════════════════════════════════════════════════════════════════════
+  if (step === 'identity') {
+    const ens = name.trim()
+      ? `${name.trim().toLowerCase().replace(/\s+/g, '')}.vivi.eth`
+      : null
+
+    return (
+      <StepCard step="identity" onBack={() => setStep('register')}>
+        <div style={{ marginBottom: 20 }}>
+          <h2 className="font-semibold text-vivi-deep" style={{ fontSize: 22, lineHeight: 1.3, marginBottom: 6 }}>
+            {tx.identity_title}
+          </h2>
+          <p className="text-vivi-gray" style={{ fontSize: 14 }}>{tx.identity_sub}</p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+          <input
+            type="text"
+            value={name}
+            autoFocus
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleIdentity()}
+            placeholder={tx.identity_placeholder}
+            style={{ height: 52, borderRadius: 14, border: '1.5px solid #E5E1FF', padding: '0 16px', fontSize: 15, outline: 'none', width: '100%' }}
+            className="text-vivi-deep bg-white focus:border-vivi-purple transition-colors"
+          />
+
+          {/* ENS name preview */}
+          {ens && (
+            <div
+              className="flex items-center gap-2 animate-bounce-in"
+              style={{ background: '#EDE9FE', borderRadius: 12, padding: '10px 14px' }}
+            >
+              <Check size={14} style={{ color: '#7C3AED', flexShrink: 0 }} />
+              <div>
+                <p style={{ fontSize: 11, color: '#7C3AED', marginBottom: 1, opacity: 0.7 }}>{tx.identity_ens_preview}</p>
+                <p style={{ fontSize: 13, color: '#2D1B4E', fontWeight: 600 }}>{ens}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Country */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: 13, fontWeight: 500, color: '#2D1B4E' }}>{tx.identity_country}</label>
+            <select
+              value={country}
+              onChange={e => updateCountry(e.target.value)}
+              style={{ height: 52, borderRadius: 14, border: '1.5px solid #E5E1FF', padding: '0 16px', fontSize: 14, outline: 'none', background: '#fff', width: '100%', appearance: 'auto' }}
+              className="text-vivi-deep focus:border-vivi-purple transition-colors cursor-pointer"
+            >
+              {COUNTRIES_LIST.map(c => (
+                <option key={c.code} value={c.code}>{c.flag} {c.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <button
+          onClick={handleIdentity}
+          disabled={!name.trim()}
+          style={{ height: 52, borderRadius: 14, background: '#7C3AED', fontSize: 15 }}
+          className="w-full text-white font-semibold disabled:opacity-40 transition-all active:scale-95"
+        >
+          {tx.identity_cta}
+        </button>
+      </StepCard>
+    )
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // WORLD ID (paso 3)
+  // ══════════════════════════════════════════════════════════════════════════
+  const wldAppId = process.env.NEXT_PUBLIC_WLD_APP_ID
+  const wldEnabled = !!(IDKitWidget && wldAppId)
+  const isDemo = !wldEnabled
+
+  return (
+    <StepCard step="worldid" onBack={() => setStep('identity')}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 6, marginBottom: 20 }}>
+        <div
+          style={{ width: 52, height: 52, borderRadius: 16, background: '#2D1B4E', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}
+        >
+          <span style={{ fontSize: 26 }}>🌍</span>
+        </div>
+        <h2 className="font-semibold text-vivi-deep" style={{ fontSize: 22 }}>{tx.worldid_title}</h2>
+        <p className="text-vivi-gray" style={{ fontSize: 14 }}>{tx.worldid_sub}</p>
+      </div>
+
+      {/* Description box */}
+      <div style={{ background: '#F5F3FF', borderRadius: 14, padding: '14px 16px', marginBottom: 16 }}>
+        <p className="text-vivi-gray" style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 8 }}>{tx.worldid_desc}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Shield size={12} style={{ color: '#10B981', flexShrink: 0 }} />
+          <span style={{ fontSize: 11, fontWeight: 500, color: '#10B981' }}>{tx.worldid_feature}</span>
+        </div>
+      </div>
+
+      {/* Demo mode label */}
+      {isDemo && (
+        <div style={{ background: '#FFFBEB', borderRadius: 10, padding: '8px 12px', marginBottom: 12, textAlign: 'center' }}>
+          <p style={{ fontSize: 11, color: '#92400E' }}>
+            {lang === 'es' ? 'Modo demo — simulación de verificación' : 'Demo mode — verification simulation'}
+          </p>
+        </div>
+      )}
+
+      {/* Verified state */}
+      {worldVerified && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginBottom: 16 }} className="animate-bounce-in">
+          <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(16,185,129,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Check size={26} style={{ color: '#10B981' }} />
+          </div>
+          <p style={{ fontWeight: 600, fontSize: 16, color: '#10B981' }}>{tx.worldid_verified} ✅</p>
+          <button
+            onClick={() => finish(true)}
+            style={{ height: 52, borderRadius: 14, background: '#7C3AED', fontSize: 15, width: '100%' }}
+            className="text-white font-semibold transition-all active:scale-95"
+          >
+            {tx.step_start}
+          </button>
+        </div>
+      )}
+
+      {/* Error state */}
+      {worldError && !worldVerified && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 12, padding: 14, marginBottom: 12, textAlign: 'center' }}>
+          <p style={{ fontSize: 13, color: '#DC2626', fontWeight: 500 }}>{tx.worldid_error}</p>
+        </div>
+      )}
+
+      {/* Buttons */}
+      {!worldVerified && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {worldLoading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
+              <div className="w-8 h-8 border-4 border-vivi-lila border-t-vivi-deep rounded-full animate-spin" />
+            </div>
+          ) : wldEnabled && IDKitWidget ? (
+            <IDKitWidget
+              app_id={wldAppId as string}
+              action={process.env.WLD_ACTION ?? 'verify-human'}
+              verification_level={VerificationLevel?.Device ?? 'device'}
+              onSuccess={handleWorldIDSuccess}
+            >
+              {({ open }: { open: () => void }) => (
+                <button
+                  onClick={open}
+                  style={{ height: 52, borderRadius: 14, background: '#2D1B4E', fontSize: 15, width: '100%' }}
+                  className="text-white font-semibold flex items-center justify-center gap-2 transition-all active:scale-95"
+                >
+                  <span>🌍</span> {worldError ? tx.worldid_retry : tx.worldid_cta}
+                </button>
+              )}
+            </IDKitWidget>
+          ) : (
+            <button
+              onClick={() => {
+                setWorldLoading(true)
+                setTimeout(() => { setWorldLoading(false); setWorldVerified(true) }, 1800)
+              }}
+              style={{ height: 52, borderRadius: 14, background: '#2D1B4E', fontSize: 15, width: '100%' }}
+              className="text-white font-semibold flex items-center justify-center gap-2 transition-all active:scale-95"
+            >
+              <span>🌍</span> {tx.worldid_cta}
+            </button>
+          )}
+
+          <button
+            onClick={() => finish(false)}
+            className="text-vivi-gray text-sm py-2 text-center hover:text-vivi-purple transition-colors"
+          >
+            {tx.worldid_skip}
+          </button>
+        </div>
+      )}
+    </StepCard>
+  )
+}
