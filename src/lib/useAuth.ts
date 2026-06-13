@@ -5,6 +5,8 @@ import type { User } from '@/context/AppContext'
 export interface AuthState {
   ready: boolean
   authenticated: boolean
+  /** True while Privy is actively creating the embedded wallet (first-time users only). */
+  walletCreating: boolean
   userId: string | null
   userEmail: string | null
   walletAddress: string | null
@@ -20,9 +22,11 @@ export function useAuth(): AuthState {
 
   const userId = user?.id ?? null
   const userEmail = user?.email?.address ?? null
-  // Privy embedded wallet is created automatically on login
+  // Privy creates the embedded wallet automatically after login (createOnLogin: 'users-without-wallets')
   const embeddedWallet = wallets.find(w => w.walletClientType === 'privy')
   const walletAddress = embeddedWallet?.address ?? null
+  // Wallet is being created when Privy is ready + authenticated but no embedded wallet exists yet
+  const walletCreating = ready && authenticated && !walletAddress
 
   function loadProfile(): User | null {
     if (!userId) return null
@@ -39,6 +43,7 @@ export function useAuth(): AuthState {
   return {
     ready,
     authenticated,
+    walletCreating,
     userId,
     userEmail,
     walletAddress,

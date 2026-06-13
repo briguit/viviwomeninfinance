@@ -50,6 +50,7 @@ interface AppContextType {
   user: User | null
   saveAndSetUser: (u: User) => void
   walletAddress: string | null
+  walletCreating: boolean
   handleLogout: () => void
   chatHistory: ChatMessage[]
   saveChatHistory: (msgs: ChatMessage[]) => void
@@ -169,6 +170,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       lang, setLang,
       user, saveAndSetUser,
       walletAddress: auth.walletAddress,
+      walletCreating: auth.walletCreating,
       handleLogout,
       chatHistory, saveChatHistory,
       challengeStatuses, completeChallengeById,

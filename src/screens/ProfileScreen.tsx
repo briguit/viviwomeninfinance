@@ -8,10 +8,18 @@ import { COUNTRY_FLAGS, COUNTRIES_LIST } from '@/lib/countryData'
 import { getEnsProfile, resolveEnsName, type EnsProfile } from '@/lib/ens'
 
 export default function ProfileScreen() {
-  const { lang, user, handleLogout, walletAddress, auth, completeChallengeById, challengeStatuses } = useApp()
+  const { lang, user, handleLogout, walletAddress, walletCreating, auth, completeChallengeById, challengeStatuses } = useApp()
   const tx = t[lang]
   const [confirmLogout, setConfirmLogout] = useState(false)
   const [showWallet, setShowWallet] = useState(false)
+
+  // Wallet creation timeout — show fallback after 20 s if wallet still not ready
+  const [walletTimedOut, setWalletTimedOut] = useState(false)
+  useEffect(() => {
+    if (!walletCreating) { setWalletTimedOut(false); return }
+    const t = setTimeout(() => setWalletTimedOut(true), 20_000)
+    return () => clearTimeout(t)
+  }, [walletCreating])
 
   // ENS state
   const [ensProfile, setEnsProfile]             = useState<EnsProfile | null>(null)
@@ -210,26 +218,63 @@ export default function ProfileScreen() {
             </div>
           </div>
 
-          {/* Wallet details toggle */}
-          <button
-            onClick={() => setShowWallet(v => !v)}
-            className="flex items-center gap-1 hover:text-vivi-purple transition-colors"
-            style={{ marginTop: 14, fontSize: 12, color: '#9CA3AF' }}
-          >
-            {showWallet ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            {tx.profile_details}
-          </button>
-          {showWallet && (
-            <div style={{ marginTop: 8, background: '#FAFAF9', borderRadius: 10, padding: '10px 12px' }}>
-              <p style={{ fontSize: 10, color: '#6B7280', fontFamily: 'monospace', wordBreak: 'break-all' }}>
-                {walletAddress ?? (lang === 'es' ? 'Generando wallet…' : 'Generating wallet…')}
-              </p>
-              {walletAddress && (
-                <p style={{ fontSize: 9, color: '#10B981', marginTop: 4, fontWeight: 500 }}>
-                  ✓ Privy Embedded Wallet · Base
-                </p>
+          {/* Wallet status indicator (visible always, not behind toggle) */}
+          {walletCreating && (
+            <div
+              style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, background: '#FFF8F0', borderRadius: 10, padding: '10px 12px', border: '1px solid rgba(251,191,36,0.25)' }}
+            >
+              {walletTimedOut ? (
+                <>
+                  <span style={{ fontSize: 14 }}>⚠️</span>
+                  <div>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: '#92400E' }}>
+                      {lang === 'es' ? 'Tardando más de lo esperado' : 'Taking longer than expected'}
+                    </p>
+                    <p style={{ fontSize: 11, color: '#B45309', marginTop: 2 }}>
+                      {lang === 'es'
+                        ? 'Puedes seguir usando la app. El wallet aparecerá pronto.'
+                        : 'You can keep using the app. Your wallet will appear shortly.'}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ width: 14, height: 14, border: '2px solid rgba(124,58,237,0.25)', borderTopColor: '#7C3AED', borderRadius: '50%', animation: 'spin 0.9s linear infinite', flexShrink: 0 }} />
+                  <div>
+                    <p style={{ fontSize: 12, fontWeight: 600, color: '#4C1D95' }}>
+                      {lang === 'es' ? 'Configurando tu wallet segura…' : 'Setting up your secure wallet…'}
+                    </p>
+                    <p style={{ fontSize: 11, color: '#7C3AED', marginTop: 2 }}>
+                      {lang === 'es' ? 'Privy está generando tus claves onchain' : 'Privy is generating your onchain keys'}
+                    </p>
+                  </div>
+                </>
               )}
             </div>
+          )}
+
+          {/* Wallet details toggle (only shown once wallet is ready) */}
+          {!walletCreating && (
+            <>
+              <button
+                onClick={() => setShowWallet(v => !v)}
+                className="flex items-center gap-1 hover:text-vivi-purple transition-colors"
+                style={{ marginTop: 14, fontSize: 12, color: '#9CA3AF' }}
+              >
+                {showWallet ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                {tx.profile_details}
+              </button>
+              {showWallet && (
+                <div style={{ marginTop: 8, background: '#FAFAF9', borderRadius: 10, padding: '10px 12px' }}>
+                  <p style={{ fontSize: 10, color: '#6B7280', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                    {walletAddress}
+                  </p>
+                  <p style={{ fontSize: 9, color: '#10B981', marginTop: 4, fontWeight: 500 }}>
+                    ✓ Privy Embedded Wallet · Base
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -406,7 +451,14 @@ export default function ProfileScreen() {
           </div>
 
           {/* ── ENS identity for this wallet ── */}
-          {ensLoading ? (
+          {walletCreating ? (
+            /* Wallet not yet ready — ENS lookup hasn't started */
+            <div style={{ height: 56, background: '#F9FAFB', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, border: '1px dashed #E5E7EB' }}>
+              <p style={{ fontSize: 13, color: '#9CA3AF' }}>
+                {lang === 'es' ? 'Esperando wallet para consultar ENS…' : 'Waiting for wallet to query ENS…'}
+              </p>
+            </div>
+          ) : ensLoading ? (
             <div style={{ height: 64, background: '#F5F3FF', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ width: 14, height: 14, border: '2px solid rgba(124,58,237,0.3)', borderTopColor: '#7C3AED', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -477,22 +529,24 @@ export default function ProfileScreen() {
                 onChange={e => setEnsLookupQuery(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && void handleEnsLookup()}
                 placeholder="vitalik.eth"
+                disabled={walletCreating}
                 style={{
                   flex: 1, height: 40, borderRadius: 8,
                   border: '1px solid #E5E7EB', padding: '0 12px',
                   fontSize: 14, color: '#2D1B4E', outline: 'none',
                   fontFamily: 'Manrope, sans-serif',
+                  opacity: walletCreating ? 0.5 : 1,
                 }}
               />
               <button
                 onClick={() => void handleEnsLookup()}
-                disabled={ensLookupLoading || !ensLookupQuery.trim()}
+                disabled={walletCreating || ensLookupLoading || !ensLookupQuery.trim()}
                 style={{
                   height: 40, padding: '0 14px', borderRadius: 8,
                   background: '#7C3AED', color: '#fff',
                   fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5,
-                  opacity: ensLookupLoading || !ensLookupQuery.trim() ? 0.5 : 1,
-                  cursor: ensLookupLoading || !ensLookupQuery.trim() ? 'not-allowed' : 'pointer',
+                  opacity: walletCreating || ensLookupLoading || !ensLookupQuery.trim() ? 0.5 : 1,
+                  cursor: walletCreating || ensLookupLoading || !ensLookupQuery.trim() ? 'not-allowed' : 'pointer',
                 }}
               >
                 {ensLookupLoading
