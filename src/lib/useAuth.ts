@@ -1,5 +1,6 @@
 'use client'
-import { usePrivy, useWallets } from '@privy-io/react-auth'
+import { useEffect, useRef } from 'react'
+import { usePrivy, useWallets, useCreateWallet } from '@privy-io/react-auth'
 import type { User } from '@/context/AppContext'
 
 export interface AuthState {
@@ -19,14 +20,35 @@ export interface AuthState {
 export function useAuth(): AuthState {
   const { ready, authenticated, user, login, logout } = usePrivy()
   const { wallets } = useWallets()
+  const { createWallet } = useCreateWallet()
 
   const userId = user?.id ?? null
   const userEmail = user?.email?.address ?? null
-  // Privy creates the embedded wallet automatically after login (createOnLogin: 'users-without-wallets')
   const embeddedWallet = wallets.find(w => w.walletClientType === 'privy')
   const walletAddress = embeddedWallet?.address ?? null
-  // Wallet is being created when Privy is ready + authenticated but no embedded wallet exists yet
   const walletCreating = ready && authenticated && !walletAddress
+
+  // createOnLogin:'users-without-wallets' only fires for Privy modal flows.
+  // For headless useLoginWithEmail we must call createWallet() manually.
+  const creationFiredRef = useRef(false)
+  const walletAddressRef = useRef(walletAddress)
+  walletAddressRef.current = walletAddress
+
+  useEffect(() => {
+    if (!ready || !authenticated) return
+    if (walletAddressRef.current) return
+    if (creationFiredRef.current) return
+    const tid = setTimeout(() => {
+      if (walletAddressRef.current) return
+      creationFiredRef.current = true
+      console.log('[Vivi] Creating embedded wallet (headless auth)...')
+      void createWallet().catch(err =>
+        console.warn('[Vivi] createWallet error:', (err as Error)?.message ?? err)
+      )
+    }, 800)
+    return () => clearTimeout(tid)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, authenticated])
 
   function loadProfile(): User | null {
     if (!userId) return null

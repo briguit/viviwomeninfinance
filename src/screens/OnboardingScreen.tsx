@@ -1,6 +1,6 @@
 'use client'
 import { useState, useRef, useEffect } from 'react'
-import { useLoginWithEmail } from '@privy-io/react-auth'
+import { useLoginWithEmail, useCreateWallet } from '@privy-io/react-auth'
 import { useApp } from '@/context/AppContext'
 import { t } from '@/lib/i18n'
 import { COUNTRIES_LIST } from '@/lib/countryData'
@@ -117,8 +117,14 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
   const [loginError, setLoginError]     = useState('')
   const otpRefs = useRef<(HTMLInputElement | null)[]>([])
 
+  const { createWallet } = useCreateWallet()
+
   const { sendCode, loginWithCode } = useLoginWithEmail({
-    onComplete: () => setStep('identity'),
+    onComplete: () => {
+      setStep('identity')
+      // headless login does not trigger createOnLogin — fire wallet creation immediately
+      void createWallet().catch(() => {})
+    },
   })
 
   const [worldLoading, setWorldLoading] = useState(false)
