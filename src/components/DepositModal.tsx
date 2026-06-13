@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Copy, Check, X, Zap, ArrowRight } from 'lucide-react'
 
 interface Props {
@@ -30,6 +30,16 @@ export default function DepositModal({
   const [apiLoading, setApiLoading] = useState(false)
   const [apiError, setApiError] = useState('')
   const es = lang === 'es'
+
+  // Reset state each time the modal opens so a re-open starts fresh
+  useEffect(() => {
+    if (open) {
+      setView('address')
+      setAmount('')
+      setApiError('')
+      setCopied(false)
+    }
+  }, [open])
 
   if (!open) return null
 

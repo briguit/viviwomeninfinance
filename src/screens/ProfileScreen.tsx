@@ -4,7 +4,8 @@ import { useApp } from '@/context/AppContext'
 import { t } from '@/lib/i18n'
 import LanguageToggle from '@/components/LanguageToggle'
 import DepositModal from '@/components/DepositModal'
-import { ExternalLink, Shield, Star, Award, LogOut, ChevronDown, ChevronUp, TrendingUp, Plus, Search } from 'lucide-react'
+import WithdrawModal from '@/components/WithdrawModal'
+import { ExternalLink, Shield, Star, Award, LogOut, ChevronDown, ChevronUp, TrendingUp, Plus, Copy, Check, Search } from 'lucide-react'
 import { COUNTRY_FLAGS, COUNTRIES_LIST } from '@/lib/countryData'
 import { getEnsProfile, resolveEnsName, type EnsProfile, type EnsLookupResult } from '@/lib/ens'
 
@@ -42,8 +43,11 @@ export default function ProfileScreen() {
   const [savingsLoading, setSavingsLoading]         = useState(false)
   const [savingsError, setSavingsError]             = useState('')
   const [showDepositModal, setShowDepositModal]     = useState(false)
+  const [showWithdrawModal, setShowWithdrawModal]   = useState(false)
   const [depositDone, setDepositDone]               = useState(false)
+  const [withdrawDone, setWithdrawDone]             = useState(false)
   const [vaultPosition, setVaultPosition]           = useState<VaultPosition | null>(null)
+  const [addrCopied, setAddrCopied]                 = useState(false)
 
   const userId = auth.userId
 
@@ -124,6 +128,13 @@ export default function ProfileScreen() {
     } finally {
       setSavingsLoading(false)
     }
+  }
+
+  function copyAddr() {
+    if (!savingsWalletAddr) return
+    void navigator.clipboard.writeText(savingsWalletAddr)
+    setAddrCopied(true)
+    setTimeout(() => setAddrCopied(false), 2000)
   }
 
   async function handleEnsLookup() {
@@ -266,171 +277,171 @@ export default function ProfileScreen() {
           )}
         </div>
 
-        {/* ── Total Balance ────────────────────────────────────────────────── */}
-        <div style={{ textAlign: 'center', padding: '4px 0' }}>
-          <p style={{ fontSize: 11, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
-            {lang === 'es' ? 'Saldo Total' : 'Total Balance'}
-          </p>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, justifyContent: 'center' }}>
-            <span style={{ fontSize: 18, fontWeight: 700, color: '#630ed4' }}>$</span>
-            <span style={{ fontSize: 48, fontWeight: 800, color: '#121c2a', lineHeight: 1, letterSpacing: '-1px' }}>
-              {user.usdcBalance.toFixed(2)}
-            </span>
-          </div>
-          {/* APY indicator from vault position or static */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, background: '#EFF4FF', borderRadius: 20, padding: '4px 12px' }}>
-            <TrendingUp size={12} style={{ color: '#630ed4' }} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#630ed4' }}>
-              {vaultPosition
-                ? `+${(parseFloat(vaultPosition.apy) * 100).toFixed(1)}% APY`
-                : (lang === 'es' ? '+4.8% APY estimado' : '+4.8% estimated APY')}
-            </span>
-          </div>
-        </div>
-
-        {/* ── Savings Wallet Card ──────────────────────────────────────────── */}
+        {/* ── Savings Vault Card (full narrative) ─────────────────────────── */}
         <div
           style={{
-            background: '#fff',
-            borderRadius: 20,
-            padding: '20px',
-            border: '1px solid rgba(124,58,237,0.12)',
-            boxShadow: '0 4px 20px rgba(99,14,212,0.07)',
-            backgroundImage: 'radial-gradient(at 10% 20%, rgba(177,136,255,0.10) 0px, transparent 50%), radial-gradient(at 90% 80%, rgba(99,14,212,0.05) 0px, transparent 50%)',
+            borderRadius: 20, overflow: 'hidden',
+            border: '1px solid rgba(124,58,237,0.18)',
+            boxShadow: '0 4px 24px rgba(45,27,78,0.12)',
           }}
         >
-          {/* Card header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: '#EDE9FE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: 20 }}>💰</span>
-            </div>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: 15, fontWeight: 700, color: '#2D1B4E', lineHeight: 1.2 }}>
-                {lang === 'es' ? 'Billetera de Ahorros' : 'Savings Wallet'}
-              </p>
-              <p style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>Privy Earn · Morpho · Base</p>
-            </div>
-            {/* Live APY badge */}
-            {(depositDone || vaultPosition) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#D1FAE5', borderRadius: 20, padding: '4px 10px' }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981' }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#065F46' }}>
-                  {vaultPosition ? `${(parseFloat(vaultPosition.apy) * 100).toFixed(1)}% APY` : '4.8% APY'}
+          {/* Dark header strip — vault branding */}
+          <div style={{ background: 'linear-gradient(135deg, #2D1B4E 0%, #3B1F6E 100%)', padding: '16px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                <TrendingUp size={13} style={{ color: '#A78BFA' }} />
+                <p style={{ fontSize: 11, color: '#A78BFA', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  PRIVY EARN · Morpho USDC · Base
+                </p>
+              </div>
+              {/* Live APY badge */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(16,185,129,0.18)', borderRadius: 20, padding: '4px 10px' }}>
+                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#10B981' }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#6EE7B7' }}>
+                  {vaultPosition ? `${(parseFloat(vaultPosition.apy) * 100).toFixed(1)}%` : '~4.8%'} APY
                 </span>
               </div>
-            )}
-          </div>
-
-          {/* Balance */}
-          <div style={{ marginBottom: 16 }}>
-            <p style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 500, marginBottom: 4 }}>
-              {lang === 'es' ? 'Disponible para uso inmediato' : 'Available for immediate use'}
-            </p>
-            <p style={{ fontSize: 34, fontWeight: 700, color: '#121c2a', lineHeight: 1, letterSpacing: '-0.5px' }}>
-              ${user.usdcBalance.toFixed(2)}
-            </p>
-            {/* Yield earned line */}
-            {vaultPosition && parseFloat(vaultPosition.yield_earned) > 0 ? (
-              <p style={{ fontSize: 12, color: '#10B981', fontWeight: 500, marginTop: 4 }}>
-                +${parseFloat(vaultPosition.yield_earned).toFixed(4)} {lang === 'es' ? 'USDC generado en yield' : 'USDC earned in yield'}
-              </p>
-            ) : (
-              <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 4 }}>
-                0.00 USDC {lang === 'es' ? 'en tránsito' : 'in transit'}
-              </p>
-            )}
-          </div>
-
-          {/* Savings address preview (if wallet exists) */}
-          {savingsWalletAddr && (
-            <div style={{ background: '#F8F9FF', borderRadius: 10, padding: '8px 12px', marginBottom: 14, border: '1px solid #EDE9FE' }}>
-              <p style={{ fontSize: 9.5, fontFamily: 'monospace', color: '#6B7280', wordBreak: 'break-all', lineHeight: 1.5 }}>
-                {savingsWalletAddr.slice(0, 12)}...{savingsWalletAddr.slice(-10)}
-              </p>
-              <p style={{ fontSize: 9, color: '#10B981', fontWeight: 600, marginTop: 2 }}>
-                ✓ Privy Server Wallet · Base (USDC)
-              </p>
             </div>
-          )}
-
-          {/* Deposit done indicator */}
-          {depositDone && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981' }} />
-              <p style={{ fontSize: 12, color: '#10B981', fontWeight: 500 }}>
-                {lang === 'es' ? 'Generando rendimiento en Morpho' : 'Earning yield on Morpho'}
-              </p>
-            </div>
-          )}
-
-          {/* CTAs */}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              onClick={() => setShowDepositModal(true)}
-              style={{
-                flex: 1, height: 48, borderRadius: 14, border: 'none',
-                background: '#630ed4', color: '#fff',
-                fontSize: 14, fontWeight: 600,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                boxShadow: '0 4px 14px rgba(99,14,212,0.28)',
-                cursor: 'pointer',
-              }}
-            >
-              <Plus size={16} />
-              {lang === 'es' ? 'Depositar' : 'Deposit'}
-            </button>
-            <button
-              disabled
-              title={lang === 'es' ? 'Próximamente' : 'Coming soon'}
-              style={{
-                flex: 1, height: 48, borderRadius: 14, border: 'none',
-                background: '#F3F4F6', color: '#9CA3AF',
-                fontSize: 14, fontWeight: 500,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                cursor: 'not-allowed',
-              }}
-            >
-              ↓ {lang === 'es' ? 'Próximamente' : 'Coming soon'}
-            </button>
-          </div>
-
-          {/* No wallet helper */}
-          {!savingsWalletId && (
-            <p style={{ fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginTop: 12, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5 }}>
               {lang === 'es'
-                ? 'Toca "Depositar" para configurar tu cuenta Privy y empezar a ganar yield.'
-                : 'Tap "Deposit" to set up your Privy savings account and start earning yield.'}
+                ? 'Deposita USDC en vaults ERC-4626 de Morpho en Base y genera yield automáticamente. Retira en cualquier momento.'
+                : 'Deposit USDC into Morpho ERC-4626 vaults on Base to earn yield automatically. Withdraw any time.'}
             </p>
-          )}
-        </div>
+          </div>
 
-        {/* ── Earn CTA card ────────────────────────────────────────────────── */}
-        <button
-          onClick={() => setShowDepositModal(true)}
-          style={{
-            width: '100%', textAlign: 'left', background: '#fff',
-            borderRadius: 18, padding: '16px 18px',
-            border: '1px solid rgba(124,58,237,0.12)',
-            boxShadow: '0 2px 10px rgba(99,14,212,0.05)',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14,
-            cursor: 'pointer',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 46, height: 46, borderRadius: '50%', background: '#EFF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <TrendingUp size={20} style={{ color: '#630ed4' }} />
-            </div>
+          {/* White body */}
+          <div style={{ background: '#fff', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+            {/* Balance */}
             <div>
-              <p style={{ fontSize: 15, fontWeight: 700, color: '#121c2a', marginBottom: 2 }}>
-                {lang === 'es' ? 'Pon tus fondos a trabajar' : 'Put your funds to work'}
+              <p style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
+                {lang === 'es' ? 'Saldo en vault' : 'Vault balance'}
               </p>
-              <p style={{ fontSize: 13, color: '#9CA3AF' }}>
-                {lang === 'es' ? 'Gana hasta 4.8% APY en tus ahorros.' : 'Earn up to 4.8% APY on your savings.'}
-              </p>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                <span style={{ fontSize: 40, fontWeight: 700, color: '#2D1B4E', lineHeight: 1, letterSpacing: '-0.5px' }}>
+                  ${vaultPosition ? parseFloat(vaultPosition.asset_balance).toFixed(2) : user.usdcBalance.toFixed(2)}
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: '#9CA3AF' }}>USDC</span>
+              </div>
+              {/* Yield earned */}
+              {vaultPosition && parseFloat(vaultPosition.yield_earned) > 0 ? (
+                <p style={{ fontSize: 12, color: '#10B981', marginTop: 4, fontWeight: 500 }}>
+                  +${parseFloat(vaultPosition.yield_earned).toFixed(4)} USDC {lang === 'es' ? 'generado en yield' : 'earned in yield'}
+                </p>
+              ) : depositDone ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#10B981' }} />
+                  <p style={{ fontSize: 12, color: '#10B981', fontWeight: 500 }}>
+                    {lang === 'es' ? 'Generando rendimiento en Morpho…' : 'Earning yield on Morpho…'}
+                  </p>
+                </div>
+              ) : (
+                <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 4 }}>
+                  0.00 USDC {lang === 'es' ? 'en tránsito' : 'in transit'}
+                </p>
+              )}
+            </div>
+
+            {/* Savings wallet address — always visible when created */}
+            {savingsWalletAddr ? (
+              <div style={{ background: '#FAFAF9', borderRadius: 12, padding: '10px 14px', border: '1px solid #F0EBFF' }}>
+                <p style={{ fontSize: 10, fontWeight: 700, color: '#7C3AED', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 7 }}>
+                  {lang === 'es' ? 'Dirección de tu savings wallet' : 'Your savings wallet address'}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  <p style={{ fontSize: 10.5, fontFamily: 'monospace', color: '#374151', flex: 1, wordBreak: 'break-all', lineHeight: 1.65 }}>
+                    {savingsWalletAddr}
+                  </p>
+                  <button
+                    onClick={copyAddr}
+                    style={{
+                      flexShrink: 0, height: 28, padding: '0 8px', borderRadius: 6, border: 'none',
+                      background: addrCopied ? '#D1FAE5' : '#EDE9FE',
+                      color: addrCopied ? '#059669' : '#7C3AED',
+                      fontSize: 11, fontWeight: 600,
+                      display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer',
+                    }}
+                  >
+                    {addrCopied
+                      ? <><Check size={10} />{lang === 'es' ? 'Copiado' : 'Copied'}</>
+                      : <><Copy size={10} />{lang === 'es' ? 'Copiar' : 'Copy'}</>
+                    }
+                  </button>
+                </div>
+                <p style={{ fontSize: 9.5, color: '#9CA3AF', marginTop: 5, fontWeight: 500 }}>
+                  ✓ Privy Server Wallet · Base Network · {lang === 'es' ? 'envía USDC aquí para depositar' : 'send USDC here to deposit'}
+                </p>
+              </div>
+            ) : (
+              /* No wallet yet — onboarding hint */
+              <div style={{ background: '#FAFAF9', borderRadius: 12, padding: '12px 14px', border: '1px dashed #E5E7EB' }}>
+                <p style={{ fontSize: 12, color: '#6B7280', lineHeight: 1.55 }}>
+                  {lang === 'es'
+                    ? '① Toca "Depositar" para crear tu savings wallet (Privy) → ② Copia la dirección y envía USDC en Base → ③ Gana ~4.8% APY en Morpho automáticamente'
+                    : '① Tap "Deposit" to create your savings wallet (Privy) → ② Copy the address and send USDC on Base → ③ Earn ~4.8% APY on Morpho automatically'}
+                </p>
+              </div>
+            )}
+
+            {/* Protocol tags */}
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+              {[
+                { label: 'Base', bg: '#DBEAFE', color: '#1D4ED8' },
+                { label: 'USDC', bg: '#D1FAE5', color: '#065F46' },
+                { label: 'Morpho ERC-4626', bg: '#EDE9FE', color: '#7C3AED' },
+                { label: 'Privy Earn', bg: '#FFFBEB', color: '#78350F' },
+              ].map(tag => (
+                <span key={tag.label} style={{ fontSize: 10, fontWeight: 600, color: tag.color, background: tag.bg, borderRadius: 6, padding: '2px 7px' }}>
+                  {tag.label}
+                </span>
+              ))}
+            </div>
+
+            {/* Withdraw done note */}
+            {withdrawDone && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F0FDF4', borderRadius: 10, padding: '8px 12px', border: '1px solid #BBF7D0' }}>
+                <span style={{ fontSize: 14 }}>✅</span>
+                <p style={{ fontSize: 12, color: '#166534', fontWeight: 500 }}>
+                  {lang === 'es'
+                    ? 'Retiro en proceso — USDC regresando a tu savings wallet.'
+                    : 'Withdrawal in progress — USDC returning to your savings wallet.'}
+                </p>
+              </div>
+            )}
+
+            {/* CTAs */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setShowDepositModal(true)}
+                style={{
+                  flex: 1, height: 48, borderRadius: 14, border: 'none',
+                  background: '#630ed4', color: '#fff', fontSize: 14, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  boxShadow: '0 4px 14px rgba(99,14,212,0.25)', cursor: 'pointer',
+                }}
+              >
+                <Plus size={15} />{lang === 'es' ? 'Depositar' : 'Deposit'}
+              </button>
+              <button
+                onClick={() => savingsWalletId && setShowWithdrawModal(true)}
+                disabled={!savingsWalletId}
+                title={!savingsWalletId ? (lang === 'es' ? 'Crea y fondea tu savings wallet primero' : 'Create and fund your savings wallet first') : undefined}
+                style={{
+                  flex: 1, height: 48, borderRadius: 14,
+                  background: '#fff',
+                  border: `1.5px solid ${savingsWalletId ? 'rgba(124,58,237,0.35)' : '#E5E7EB'}`,
+                  color: savingsWalletId ? '#7C3AED' : '#9CA3AF',
+                  fontSize: 14, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  cursor: savingsWalletId ? 'pointer' : 'not-allowed',
+                  opacity: savingsWalletId ? 1 : 0.55,
+                }}
+              >
+                ↓ {lang === 'es' ? 'Retirar' : 'Withdraw'}
+              </button>
             </div>
           </div>
-          <span style={{ fontSize: 18, color: '#9CA3AF', flexShrink: 0 }}>›</span>
-        </button>
+        </div>
 
         {/* ── Stats ────────────────────────────────────────────────────────── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
@@ -719,6 +730,18 @@ export default function ProfileScreen() {
         lang={lang}
         onDepositConfirmed={() => setDepositDone(true)}
       />
+
+      {savingsWalletId && savingsWalletAddr && (
+        <WithdrawModal
+          open={showWithdrawModal}
+          onClose={() => setShowWithdrawModal(false)}
+          savingsWalletId={savingsWalletId}
+          savingsWalletAddr={savingsWalletAddr}
+          vaultBalance={vaultPosition?.asset_balance}
+          lang={lang}
+          onWithdrawConfirmed={() => setWithdrawDone(true)}
+        />
+      )}
     </div>
   )
 }
