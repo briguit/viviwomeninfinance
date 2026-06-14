@@ -88,8 +88,8 @@ export default function WithdrawModal({
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 700, color: '#2D1B4E', lineHeight: 1.2 }}>
               {view === 'success'
-                ? (es ? '¡Retiro solicitado!' : 'Withdrawal requested!')
-                : (es ? 'Retirar USDC' : 'Withdraw USDC')}
+                ? (es ? '¡Retiro a wallet enviado!' : 'Withdrawn to wallet!')
+                : (es ? 'Retirar a wallet' : 'Withdraw to wallet')}
             </h2>
             <p style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>
               Base · Morpho Vault · Privy Earn

@@ -6,7 +6,8 @@ import LanguageToggle from '@/components/LanguageToggle'
 import DepositModal from '@/components/DepositModal'
 import WithdrawModal from '@/components/WithdrawModal'
 import SendModal from '@/components/SendModal'
-import { ExternalLink, Shield, Star, Award, LogOut, ChevronDown, ChevronUp, TrendingUp, Plus, Copy, Check, Search, ArrowUpRight } from 'lucide-react'
+import ReceiveModal from '@/components/ReceiveModal'
+import { ExternalLink, Shield, Star, Award, LogOut, ChevronDown, ChevronUp, TrendingUp, Search } from 'lucide-react'
 import { COUNTRY_FLAGS, COUNTRIES_LIST } from '@/lib/countryData'
 import { getEnsProfile, resolveEnsName, type EnsProfile, type EnsLookupResult } from '@/lib/ens'
 
@@ -48,10 +49,10 @@ export default function ProfileScreen() {
   const [depositDone, setDepositDone]               = useState(false)
   const [withdrawDone, setWithdrawDone]             = useState(false)
   const [vaultPosition, setVaultPosition]           = useState<VaultPosition | null>(null)
-  const [addrCopied, setAddrCopied]                 = useState(false)
   const [realUsdcBalance, setRealUsdcBalance]       = useState<number | null>(null)
   const [realBalanceLoading, setRealBalanceLoading] = useState(false)
   const [showSendModal, setShowSendModal]           = useState(false)
+  const [showReceiveModal, setShowReceiveModal]     = useState(false)
 
   const userId = auth.userId
 
@@ -143,13 +144,6 @@ export default function ProfileScreen() {
     } finally {
       setSavingsLoading(false)
     }
-  }
-
-  function copyAddr() {
-    if (!savingsWalletAddr) return
-    void navigator.clipboard.writeText(savingsWalletAddr)
-    setAddrCopied(true)
-    setTimeout(() => setAddrCopied(false), 2000)
   }
 
   async function fetchRealBalance() {
@@ -358,80 +352,60 @@ export default function ProfileScreen() {
               )}
             </div>
 
-            {/* Wallet address */}
+            {/* Savings wallet CTAs */}
             {savingsWalletAddr ? (
-              <div style={{ background: '#FAFAF9', borderRadius: 10, padding: '10px 12px', border: '1px solid #F0EBFF', marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                  <p style={{ fontSize: 10.5, fontFamily: 'monospace', color: '#374151', flex: 1, wordBreak: 'break-all', lineHeight: 1.65 }}>
-                    {savingsWalletAddr}
-                  </p>
-                  <button
-                    onClick={copyAddr}
-                    style={{
-                      flexShrink: 0, height: 26, padding: '0 8px', borderRadius: 6, border: 'none',
-                      background: addrCopied ? '#D1FAE5' : '#EDE9FE',
-                      color: addrCopied ? '#059669' : '#7C3AED',
-                      fontSize: 11, fontWeight: 600,
-                      display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer',
-                    }}
-                  >
-                    {addrCopied
-                      ? <><Check size={10} />{lang === 'es' ? 'Copiado' : 'Copied'}</>
-                      : <><Copy size={10} />{lang === 'es' ? 'Copiar' : 'Copy'}</>
-                    }
-                  </button>
-                </div>
-                <p style={{ fontSize: 9.5, color: '#9CA3AF', marginTop: 4 }}>
-                  {lang === 'es' ? 'Envía USDC en Base aquí para fondear tu savings wallet' : 'Send USDC on Base here to fund your savings wallet'}
-                </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => setShowReceiveModal(true)}
+                  style={{
+                    flex: 1, height: 44, borderRadius: 12, border: 'none',
+                    background: '#630ed4', color: '#fff', fontSize: 13, fontWeight: 600,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                    cursor: 'pointer', boxShadow: '0 3px 12px rgba(99,14,212,0.22)',
+                  }}
+                >
+                  📥 {lang === 'es' ? 'Recibir' : 'Receive'}
+                </button>
+                <button
+                  onClick={() => setShowSendModal(true)}
+                  disabled={(realUsdcBalance ?? 0) === 0}
+                  style={{
+                    flex: 1, height: 44, borderRadius: 12,
+                    background: '#fff',
+                    border: `1.5px solid ${(realUsdcBalance ?? 0) > 0 ? 'rgba(124,58,237,0.35)' : '#E5E7EB'}`,
+                    color: (realUsdcBalance ?? 0) > 0 ? '#7C3AED' : '#9CA3AF',
+                    fontSize: 13, fontWeight: 600,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                    cursor: (realUsdcBalance ?? 0) > 0 ? 'pointer' : 'not-allowed',
+                    opacity: (realUsdcBalance ?? 0) > 0 ? 1 : 0.5,
+                  }}
+                >
+                  📤 {lang === 'es' ? 'Enviar' : 'Send'}
+                </button>
               </div>
             ) : (
-              <div style={{ background: '#FAFAF9', borderRadius: 10, padding: '10px 12px', border: '1px dashed #E5E7EB', marginBottom: 12 }}>
-                <p style={{ fontSize: 12, color: '#9CA3AF', lineHeight: 1.5 }}>
-                  {lang === 'es'
-                    ? 'Toca "Depositar al vault" para crear tu savings wallet y obtener tu dirección Base.'
-                    : 'Tap "Deposit to vault" to create your savings wallet and get your Base address.'}
-                </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button
+                  onClick={() => void handleCreateSavingsWallet()}
+                  disabled={savingsLoading}
+                  style={{
+                    width: '100%', height: 44, borderRadius: 12, border: 'none',
+                    background: savingsLoading ? 'rgba(99,14,212,0.55)' : '#630ed4',
+                    color: '#fff', fontSize: 13, fontWeight: 600,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                    cursor: savingsLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {savingsLoading
+                    ? <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />{lang === 'es' ? 'Creando wallet…' : 'Creating wallet…'}</>
+                    : <>{lang === 'es' ? 'Crear cuenta de ahorro' : 'Create savings account'}</>
+                  }
+                </button>
+                {savingsError && (
+                  <p style={{ fontSize: 12, color: '#EF4444', lineHeight: 1.5 }}>{savingsError}</p>
+                )}
               </div>
             )}
-
-            {/* Savings wallet CTAs */}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => setShowDepositModal(true)}
-                style={{
-                  flex: 1, height: 44, borderRadius: 12, border: 'none',
-                  background: '#630ed4', color: '#fff', fontSize: 13, fontWeight: 600,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                  cursor: 'pointer', boxShadow: '0 3px 12px rgba(99,14,212,0.22)',
-                }}
-              >
-                <Plus size={14} />{lang === 'es' ? 'Depositar al vault' : 'Deposit to vault'}
-              </button>
-              <button
-                onClick={() => savingsWalletId && setShowSendModal(true)}
-                disabled={!savingsWalletId || (realUsdcBalance ?? 0) === 0}
-                title={
-                  !savingsWalletId
-                    ? (lang === 'es' ? 'Crea tu savings wallet primero' : 'Create your savings wallet first')
-                    : (realUsdcBalance ?? 0) === 0
-                    ? (lang === 'es' ? 'Fondea tu savings wallet con USDC primero' : 'Fund your savings wallet with USDC first')
-                    : undefined
-                }
-                style={{
-                  flex: 1, height: 44, borderRadius: 12,
-                  background: '#fff',
-                  border: `1.5px solid ${savingsWalletId && (realUsdcBalance ?? 0) > 0 ? 'rgba(124,58,237,0.35)' : '#E5E7EB'}`,
-                  color: savingsWalletId && (realUsdcBalance ?? 0) > 0 ? '#7C3AED' : '#9CA3AF',
-                  fontSize: 13, fontWeight: 600,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                  cursor: savingsWalletId && (realUsdcBalance ?? 0) > 0 ? 'pointer' : 'not-allowed',
-                  opacity: savingsWalletId && (realUsdcBalance ?? 0) > 0 ? 1 : 0.5,
-                }}
-              >
-                <ArrowUpRight size={14} />{lang === 'es' ? 'Enviar USDC' : 'Send USDC'}
-              </button>
-            </div>
           </div>
 
           {/* Section B: Morpho Vault */}
@@ -464,23 +438,40 @@ export default function ProfileScreen() {
               </p>
             )}
 
-            <button
-              onClick={() => savingsWalletId && setShowWithdrawModal(true)}
-              disabled={!savingsWalletId}
-              style={{
-                width: '100%', height: 42, borderRadius: 12,
-                background: '#fff',
-                border: `1.5px solid ${savingsWalletId ? 'rgba(124,58,237,0.3)' : '#E5E7EB'}`,
-                color: savingsWalletId ? '#7C3AED' : '#9CA3AF',
-                fontSize: 13, fontWeight: 600,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                cursor: savingsWalletId ? 'pointer' : 'not-allowed',
-                opacity: savingsWalletId ? 1 : 0.5,
-                marginBottom: withdrawDone ? 10 : 12,
-              }}
-            >
-              ↓ {lang === 'es' ? 'Retirar al savings wallet' : 'Withdraw to savings wallet'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, marginBottom: withdrawDone ? 10 : 12 }}>
+              <button
+                onClick={() => savingsWalletId && setShowDepositModal(true)}
+                disabled={!savingsWalletId}
+                style={{
+                  flex: 1, height: 42, borderRadius: 12, border: 'none',
+                  background: savingsWalletId ? '#630ed4' : '#E5E7EB',
+                  color: savingsWalletId ? '#fff' : '#9CA3AF',
+                  fontSize: 13, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  cursor: savingsWalletId ? 'pointer' : 'not-allowed',
+                  opacity: savingsWalletId ? 1 : 0.5,
+                  boxShadow: savingsWalletId ? '0 3px 12px rgba(99,14,212,0.22)' : 'none',
+                }}
+              >
+                ↓ {lang === 'es' ? 'Transferir a ahorro' : 'Move to savings'}
+              </button>
+              <button
+                onClick={() => savingsWalletId && setShowWithdrawModal(true)}
+                disabled={!savingsWalletId}
+                style={{
+                  flex: 1, height: 42, borderRadius: 12,
+                  background: '#fff',
+                  border: `1.5px solid ${savingsWalletId ? 'rgba(124,58,237,0.3)' : '#E5E7EB'}`,
+                  color: savingsWalletId ? '#7C3AED' : '#9CA3AF',
+                  fontSize: 13, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  cursor: savingsWalletId ? 'pointer' : 'not-allowed',
+                  opacity: savingsWalletId ? 1 : 0.5,
+                }}
+              >
+                ↑ {lang === 'es' ? 'Retirar a wallet' : 'Withdraw to wallet'}
+              </button>
+            </div>
 
             {withdrawDone && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#F0FDF4', borderRadius: 10, padding: '8px 12px', border: '1px solid #BBF7D0', marginBottom: 12 }}>
@@ -811,21 +802,27 @@ export default function ProfileScreen() {
 
       </div>
 
-      <DepositModal
-        open={showDepositModal}
-        onClose={() => setShowDepositModal(false)}
-        savingsWalletId={savingsWalletId}
-        savingsWalletAddr={savingsWalletAddr}
-        onCreateWallet={handleCreateSavingsWallet}
-        walletLoading={savingsLoading}
-        walletError={savingsError}
-        lang={lang}
-        availableBalance={realUsdcBalance ?? 0}
-        onDepositConfirmed={() => {
-          setDepositDone(true)
-          setTimeout(() => void fetchRealBalance(), 3000)
-        }}
-      />
+      {savingsWalletId && (
+        <DepositModal
+          open={showDepositModal}
+          onClose={() => setShowDepositModal(false)}
+          savingsWalletId={savingsWalletId}
+          availableBalance={realUsdcBalance ?? 0}
+          lang={lang}
+          onDepositConfirmed={() => {
+            setDepositDone(true)
+            setTimeout(() => void fetchRealBalance(), 3000)
+          }}
+        />
+      )}
+      {savingsWalletAddr && (
+        <ReceiveModal
+          open={showReceiveModal}
+          onClose={() => setShowReceiveModal(false)}
+          address={savingsWalletAddr}
+          lang={lang}
+        />
+      )}
 
       {savingsWalletId && savingsWalletAddr && (
         <WithdrawModal
