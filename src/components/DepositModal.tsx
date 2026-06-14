@@ -11,6 +11,7 @@ interface Props {
   walletLoading: boolean
   walletError: string
   lang: 'es' | 'en'
+  availableBalance: number
   onDepositConfirmed: () => void
 }
 
@@ -22,7 +23,7 @@ export default function DepositModal({
   open, onClose,
   savingsWalletId, savingsWalletAddr,
   onCreateWallet, walletLoading, walletError,
-  lang, onDepositConfirmed,
+  lang, availableBalance, onDepositConfirmed,
 }: Props) {
   const [copied, setCopied] = useState(false)
   const [amount, setAmount] = useState('')
@@ -54,6 +55,15 @@ export default function DepositModal({
 
   async function handleSentFunds() {
     if (!savingsWalletId) return
+    const numAmount = parseFloat(amount || '1')
+    if (availableBalance > 0 && numAmount > availableBalance) {
+      setApiError(
+        es
+          ? `Tu savings wallet solo tiene $${availableBalance.toFixed(2)} USDC disponibles.`
+          : `Your savings wallet only has $${availableBalance.toFixed(2)} USDC available.`
+      )
+      return
+    }
     setApiLoading(true)
     setApiError('')
     try {
@@ -156,6 +166,19 @@ export default function DepositModal({
           {/* ── ADDRESS: wallet exists, show copy + send ── */}
           {!showSetup && savingsWalletAddr && view === 'address' && (
             <>
+              {/* Available balance banner */}
+              <div style={{ background: '#F5F3FF', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <p style={{ fontSize: 11, color: '#7C3AED', fontWeight: 600, marginBottom: 1 }}>
+                    {es ? 'Disponible en savings wallet' : 'Available in savings wallet'}
+                  </p>
+                  <p style={{ fontSize: 18, fontWeight: 700, color: '#2D1B4E', lineHeight: 1 }}>
+                    ${availableBalance.toFixed(2)} <span style={{ fontSize: 12, fontWeight: 500, color: '#9CA3AF' }}>USDC</span>
+                  </p>
+                </div>
+                <span style={{ fontSize: 10, fontWeight: 600, color: '#1D4ED8', background: '#DBEAFE', borderRadius: 6, padding: '3px 8px' }}>Base</span>
+              </div>
+
               {/* Network badges */}
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {[
