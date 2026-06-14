@@ -7,6 +7,7 @@ import DepositModal from '@/components/DepositModal'
 import WithdrawModal from '@/components/WithdrawModal'
 import SendModal from '@/components/SendModal'
 import ReceiveModal from '@/components/ReceiveModal'
+import WorldIDVerifyButton from '@/components/WorldIDVerifyButton'
 import { ExternalLink, Shield, Star, Award, LogOut, ChevronDown, ChevronUp, TrendingUp, Search } from 'lucide-react'
 import { COUNTRY_FLAGS, COUNTRIES_LIST } from '@/lib/countryData'
 import { getEnsProfile, resolveEnsName, type EnsProfile, type EnsLookupResult } from '@/lib/ens'
@@ -18,7 +19,7 @@ interface VaultPosition {
 }
 
 export default function ProfileScreen() {
-  const { lang, user, handleLogout, walletAddress, walletCreating, auth, completeChallengeById, challengeStatuses } = useApp()
+  const { lang, user, handleLogout, walletAddress, walletCreating, auth, completeChallengeById, challengeStatuses, updateUser } = useApp()
   const tx = t[lang]
   const [confirmLogout, setConfirmLogout] = useState(false)
   const [showWallet, setShowWallet] = useState(false)
@@ -297,6 +298,46 @@ export default function ProfileScreen() {
           )}
         </div>
 
+        {/* ── World ID verification gate ─────────────────────────────────── */}
+        {user.worldIdVerified ? (
+          <div style={{ background: '#F0FDF4', borderRadius: 20, padding: '14px 20px', border: '1px solid #BBF7D0', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(16,185,129,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Shield size={18} style={{ color: '#059669' }} />
+            </div>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#065F46', marginBottom: 1 }}>
+                {lang === 'es' ? '✅ Identidad verificada con World ID' : '✅ Identity verified with World ID'}
+              </p>
+              <p style={{ fontSize: 11, color: '#10B981' }}>
+                {lang === 'es' ? 'Privacidad ZK — tus datos no fueron revelados' : 'ZK privacy — your data was never revealed'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div style={{ background: '#fff', borderRadius: 20, padding: '20px', border: '1.5px solid rgba(45,27,78,0.18)', boxShadow: '0 2px 12px rgba(45,27,78,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 12, background: '#2D1B4E', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: 20 }}>🌍</span>
+              </div>
+              <div>
+                <p style={{ fontSize: 15, fontWeight: 600, color: '#2D1B4E', marginBottom: 2 }}>
+                  {lang === 'es' ? 'Verifica tu identidad' : 'Verify your identity'}
+                </p>
+                <p style={{ fontSize: 12, color: '#9CA3AF' }}>World ID · ZK Privacy</p>
+              </div>
+            </div>
+            <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.65, marginBottom: 14 }}>
+              {lang === 'es'
+                ? 'Vivi garantiza 1 beca por persona real. Sin World ID, alguien podría crear 1000 cuentas y vaciar el fondo. Verifica sin revelar quién eres.'
+                : "Vivi guarantees 1 scholarship per real person. Without World ID, someone could create 1000 accounts and drain the fund. Verify without revealing who you are."}
+            </p>
+            <WorldIDVerifyButton
+              lang={lang}
+              onVerified={() => updateUser({ ...user, worldIdVerified: true, usdcBalance: user.usdcBalance + 5 })}
+            />
+          </div>
+        )}
+
         {/* ── Savings Vault Card (savings wallet + morpho vault) ── */}
         <div
           style={{
@@ -503,7 +544,7 @@ export default function ProfileScreen() {
         {/* ── Vivi Rewards (educational points — NOT real USDC) ── */}
         <div style={{ background: '#FFF8F0', borderRadius: 20, padding: '16px 20px', border: '1px solid rgba(251,191,36,0.3)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
+            <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                 <span style={{ fontSize: 14 }}>🎁</span>
                 <p style={{ fontSize: 11, fontWeight: 700, color: '#92400E', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -515,14 +556,25 @@ export default function ProfileScreen() {
                   ? 'Puntos educativos por completar retos. No son USDC real onchain.'
                   : 'Educational points for completing challenges. Not real onchain USDC.'}
               </p>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <span style={{ fontSize: 24, fontWeight: 700, color: '#92400E', lineHeight: 1 }}>
-                  {user.usdcBalance.toFixed(0)}
-                </span>
-                <span style={{ fontSize: 12, color: '#B45309', fontWeight: 600 }}>pts</span>
-              </div>
+              {user.worldIdVerified ? (
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                  <span style={{ fontSize: 24, fontWeight: 700, color: '#92400E', lineHeight: 1 }}>
+                    {user.usdcBalance.toFixed(0)}
+                  </span>
+                  <span style={{ fontSize: 12, color: '#B45309', fontWeight: 600 }}>pts</span>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(251,191,36,0.15)', borderRadius: 8, padding: '6px 10px' }}>
+                  <span style={{ fontSize: 14 }}>🔒</span>
+                  <p style={{ fontSize: 12, color: '#92400E', lineHeight: 1.4 }}>
+                    {lang === 'es'
+                      ? 'Pendiente de verificación — verifica con World ID para desbloquear'
+                      : 'Pending verification — verify with World ID to unlock'}
+                  </p>
+                </div>
+              )}
             </div>
-            <span style={{ fontSize: 36 }}>🏆</span>
+            <span style={{ fontSize: 36, marginLeft: 12 }}>{user.worldIdVerified ? '🏆' : '🔒'}</span>
           </div>
         </div>
 

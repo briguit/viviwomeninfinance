@@ -49,6 +49,7 @@ interface AppContextType {
   setLang: (l: Lang) => void
   user: User | null
   saveAndSetUser: (u: User) => void
+  updateUser: (u: User) => void
   walletAddress: string | null
   walletCreating: boolean
   handleLogout: () => void
@@ -136,7 +137,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newPoints = prev.points + reward * 10
       const updated: User = {
         ...prev,
-        usdcBalance: Math.round((prev.usdcBalance + reward) * 100) / 100,
+        // USDC rewards only paid to World ID-verified humans (Sybil gate)
+        usdcBalance: prev.worldIdVerified
+          ? Math.round((prev.usdcBalance + reward) * 100) / 100
+          : prev.usdcBalance,
         points: newPoints,
         level: Math.floor(newPoints / 100) + 1,
         challengesCompleted: prev.challengesCompleted + 1,
@@ -155,6 +159,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth])
 
+  // Update user in-place (profile + auth) without changing screen or route
+  const updateUser = useCallback((u: User) => {
+    setUser(u)
+    auth.saveProfile(u)
+  }, [auth])
+
   const handleLogout = useCallback(() => {
     void auth.logout()
     setUser(null)
@@ -168,7 +178,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider value={{
       auth, route, screen, setScreen,
       lang, setLang,
-      user, saveAndSetUser,
+      user, saveAndSetUser, updateUser,
       walletAddress: auth.walletAddress,
       walletCreating: auth.walletCreating,
       handleLogout,

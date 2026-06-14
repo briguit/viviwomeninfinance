@@ -30,13 +30,14 @@ function StatusIcon({ status }: { status: ChallengeStatus }) {
   return <Circle size={20} style={{ color: '#7C3AED' }} />
 }
 
-interface ModalData { titleKey: keyof typeof t.es; reward: number }
+interface ModalData { titleKey: keyof typeof t.es; reward: number; worldIdGated?: boolean }
 
 export default function ChallengesScreen() {
   const { lang, user, challengeStatuses, completeChallengeById, setScreen } = useApp()
   const tx = t[lang]
   const [confetti, setConfetti] = useState(false)
   const [modal, setModal] = useState<ModalData | null>(null)
+  const isVerified = user?.worldIdVerified ?? false
 
   const points = user?.points ?? 0
   const level  = user?.level  ?? 1
@@ -52,10 +53,16 @@ export default function ChallengesScreen() {
       return
     }
 
-    setConfetti(true)
-    setTimeout(() => setConfetti(false), 120)
     completeChallengeById(ch.id, ch.reward)
-    setModal({ titleKey: ch.titleKey, reward: ch.reward })
+
+    if (isVerified) {
+      setConfetti(true)
+      setTimeout(() => setConfetti(false), 120)
+      setModal({ titleKey: ch.titleKey, reward: ch.reward, worldIdGated: false })
+    } else {
+      // Challenge marked complete + points awarded, but USDC is gated
+      setModal({ titleKey: ch.titleKey, reward: ch.reward, worldIdGated: true })
+    }
   }
 
   return (
@@ -227,35 +234,66 @@ export default function ChallengesScreen() {
               <X size={20} />
             </button>
 
-            <div style={{ fontSize: 52 }} className="animate-bounce">🎉</div>
-
-            <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: 18, fontWeight: 600, color: '#2D1B4E', marginBottom: 4 }}>
-                {tx.modal_congrats}{' '}
-                <span style={{ color: '#FBBF24' }}>{modal.reward} {tx.modal_usdc}</span>
-              </p>
-              <p style={{ fontSize: 14, color: '#6B7280' }}>
-                {tx[modal.titleKey] as string}
-              </p>
-            </div>
-
-            {/* Balance display */}
-            <div style={{ width: '100%', background: '#F5F3FF', borderRadius: 18, padding: '16px', textAlign: 'center' }}>
-              <p style={{ fontSize: 36, fontWeight: 700, color: '#7C3AED', lineHeight: 1 }}>
-                ${(user?.usdcBalance ?? 0).toFixed(2)}
-              </p>
-              <p style={{ fontSize: 12, color: '#6B7280', marginTop: 4 }}>
-                {lang === 'es' ? 'Tu nuevo balance USDC' : 'Your new USDC balance'}
-              </p>
-            </div>
-
-            <button
-              onClick={() => setModal(null)}
-              style={{ width: '100%', height: 50, borderRadius: 14, background: '#7C3AED', fontSize: 15 }}
-              className="text-white font-semibold transition-all active:scale-95"
-            >
-              {tx.modal_view}
-            </button>
+            {modal.worldIdGated ? (
+              /* ── NOT VERIFIED: show gate message ── */
+              <>
+                <div style={{ fontSize: 52 }}>🔒</div>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: 18, fontWeight: 600, color: '#2D1B4E', marginBottom: 6 }}>
+                    {lang === 'es' ? '¡Reto completado! 🎉' : 'Challenge complete! 🎉'}
+                  </p>
+                  <p style={{ fontSize: 14, color: '#6B7280', lineHeight: 1.6 }}>
+                    {lang === 'es'
+                      ? `Ganaste ${modal.reward * 10} pts. Para recibir los $${modal.reward} USDC, necesitas verificar tu identidad con World ID.`
+                      : `You earned ${modal.reward * 10} pts. To receive $${modal.reward} USDC, you need to verify your identity with World ID.`}
+                  </p>
+                </div>
+                <div style={{ width: '100%', background: '#FFF8F0', borderRadius: 14, padding: '12px 16px', border: '1px solid rgba(251,191,36,0.3)', textAlign: 'center' }}>
+                  <p style={{ fontSize: 12, color: '#92400E', lineHeight: 1.5 }}>
+                    🌍 {lang === 'es'
+                      ? 'Vivi garantiza 1 beca por persona real — World ID previene que alguien cree 1000 cuentas y vacíe el fondo.'
+                      : 'Vivi guarantees 1 scholarship per real person — World ID prevents someone from creating 1000 accounts and draining the fund.'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setModal(null); setScreen('profile') }}
+                  style={{ width: '100%', height: 50, borderRadius: 14, background: '#2D1B4E', fontSize: 15, border: 'none', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  🌍 {lang === 'es' ? 'Verificar con World ID →' : 'Verify with World ID →'}
+                </button>
+                <button onClick={() => setModal(null)} style={{ fontSize: 13, color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer' }}>
+                  {lang === 'es' ? 'Ahora no' : 'Not now'}
+                </button>
+              </>
+            ) : (
+              /* ── VERIFIED: normal confetti modal ── */
+              <>
+                <div style={{ fontSize: 52 }} className="animate-bounce">🎉</div>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: 18, fontWeight: 600, color: '#2D1B4E', marginBottom: 4 }}>
+                    {tx.modal_congrats}{' '}
+                    <span style={{ color: '#FBBF24' }}>{modal.reward} {tx.modal_usdc}</span>
+                  </p>
+                  <p style={{ fontSize: 14, color: '#6B7280' }}>
+                    {tx[modal.titleKey] as string}
+                  </p>
+                </div>
+                <div style={{ width: '100%', background: '#F5F3FF', borderRadius: 18, padding: '16px', textAlign: 'center' }}>
+                  <p style={{ fontSize: 36, fontWeight: 700, color: '#7C3AED', lineHeight: 1 }}>
+                    ${(user?.usdcBalance ?? 0).toFixed(2)}
+                  </p>
+                  <p style={{ fontSize: 12, color: '#6B7280', marginTop: 4 }}>
+                    {lang === 'es' ? 'Tu nuevo balance USDC' : 'Your new USDC balance'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setModal(null)}
+                  style={{ width: '100%', height: 50, borderRadius: 14, background: '#7C3AED', fontSize: 15, border: 'none', color: '#fff', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  {tx.modal_view}
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}

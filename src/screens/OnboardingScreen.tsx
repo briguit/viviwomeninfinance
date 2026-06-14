@@ -6,24 +6,7 @@ import { t } from '@/lib/i18n'
 import { COUNTRIES_LIST } from '@/lib/countryData'
 import LanguageToggle from '@/components/LanguageToggle'
 import { Check, Shield, ChevronLeft, Mail, Lock, ArrowLeft } from 'lucide-react'
-
-// World ID — imported only when app_id is configured
-type IDKitModule = typeof import('@worldcoin/idkit')
-
-interface IDKitProps {
-  app_id: string
-  action: string
-  verification_level?: string
-  onSuccess: (proof: WorldIDProof) => void
-  children: (props: { open: () => void }) => React.ReactNode
-}
-
-interface WorldIDProof {
-  proof: string
-  merkle_root: string
-  nullifier_hash: string
-  verification_level: string
-}
+import WorldIDVerifyButton from '@/components/WorldIDVerifyButton'
 
 type Step = 'splash' | 'login' | 'identity' | 'worldid'
 
@@ -120,10 +103,7 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
     },
   })
 
-  const [worldLoading, setWorldLoading] = useState(false)
   const [worldVerified, setWorldVerified] = useState(false)
-  const [worldError, setWorldError] = useState(false)
-  const [idKit, setIdKit] = useState<IDKitModule | null>(null)
 
   // When Privy auth completes, move to identity step
   useEffect(() => {
@@ -131,14 +111,6 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
       setStep('identity')
     }
   }, [auth.authenticated, step])
-
-  useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_WLD_APP_ID) return
-
-    void import('@worldcoin/idkit')
-      .then(setIdKit)
-      .catch(() => setIdKit(null))
-  }, [])
 
   // ── Login handlers ─────────────────────────────────────────────────────────
   async function handleSendCode(e: React.FormEvent) {
@@ -206,26 +178,6 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
     setStep('worldid')
   }
 
-  async function handleWorldIDSuccess(proof: WorldIDProof) {
-    setWorldLoading(true)
-    setWorldError(false)
-    try {
-      const res = await fetch('/api/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(proof),
-      })
-      const data = await res.json() as { success: boolean }
-      if (data.success) {
-        setWorldVerified(true)
-        setWorldLoading(false)
-      } else throw new Error('not verified')
-    } catch {
-      setWorldLoading(false)
-      setWorldError(true)
-    }
-  }
-
   function finish(verified: boolean) {
     const currentCountry = countryRef.current
     const trimmedName = name.trim()
@@ -234,7 +186,7 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
       viviEns: `${trimmedName.toLowerCase().replace(/\s+/g, '')}.vivi.eth`,
       country: currentCountry,
       worldIdVerified: verified,
-      usdcBalance: 5.0,
+      usdcBalance: verified ? 5.0 : 0,
       points: 0,
       level: 1,
       challengesCompleted: 0,
@@ -590,13 +542,6 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
   // ══════════════════════════════════════════════════════════════════════════
   // WORLD ID (paso 3)
   // ══════════════════════════════════════════════════════════════════════════
-  const wldAppId = process.env.NEXT_PUBLIC_WLD_APP_ID
-  const wldAction = process.env.NEXT_PUBLIC_WLD_ACTION ?? 'verify-human'
-  const IDKitWidget = idKit?.IDKitWidget
-  const VerificationLevel = idKit?.VerificationLevel
-  const wldEnabled = !!(IDKitWidget && wldAppId)
-  const isDemo = !wldEnabled
-
   return (
     <StepCard step="worldid" onBack={() => setStep('identity')}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 6, marginBottom: 20 }}>
@@ -609,23 +554,27 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
         <p className="text-vivi-gray" style={{ fontSize: 14 }}>{tx.worldid_sub}</p>
       </div>
 
-      {/* Description box */}
+      {/* Sybil-resistance explanation — why this gate exists */}
       <div style={{ background: '#F5F3FF', borderRadius: 14, padding: '14px 16px', marginBottom: 16 }}>
-        <p className="text-vivi-gray" style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 8 }}>{tx.worldid_desc}</p>
+        <p className="text-vivi-gray" style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 8 }}>
+          {lang === 'es'
+            ? 'Vivi da 1 beca real por persona — si no verificamos, alguien podría crear 1000 cuentas y vaciar el fondo. World ID garantiza que eres humana sin revelar quién eres.'
+            : 'Vivi gives 1 real scholarship per person — without this, someone could create 1000 accounts and drain the fund. World ID proves you\'re human without revealing who you are.'}
+        </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Shield size={12} style={{ color: '#10B981', flexShrink: 0 }} />
           <span style={{ fontSize: 11, fontWeight: 500, color: '#10B981' }}>{tx.worldid_feature}</span>
         </div>
       </div>
 
-      {/* Demo mode label */}
-      {isDemo && (
-        <div style={{ background: '#FFFBEB', borderRadius: 10, padding: '8px 12px', marginBottom: 12, textAlign: 'center' }}>
-          <p style={{ fontSize: 11, color: '#92400E' }}>
-            {lang === 'es' ? 'Modo demo — simulación de verificación' : 'Demo mode — verification simulation'}
-          </p>
-        </div>
-      )}
+      {/* What you unlock */}
+      <div style={{ background: '#FFFBEB', borderRadius: 12, padding: '10px 14px', marginBottom: 16, border: '1px solid #FDE68A' }}>
+        <p style={{ fontSize: 12, color: '#92400E', lineHeight: 1.5 }}>
+          🎁 {lang === 'es'
+            ? 'Verificar desbloquea: 5 USDC de bienvenida + recompensas de todos los retos'
+            : 'Verifying unlocks: 5 USDC welcome bonus + rewards from all challenges'}
+        </p>
+      </div>
 
       {/* Verified state */}
       {worldVerified && (
@@ -634,60 +583,22 @@ export default function OnboardingScreen({ startAtIdentity = false }: Props) {
             <Check size={26} style={{ color: '#10B981' }} />
           </div>
           <p style={{ fontWeight: 600, fontSize: 16, color: '#10B981' }}>{tx.worldid_verified} ✅</p>
-          <button
-            onClick={() => finish(true)}
-            style={{ height: 52, borderRadius: 14, background: '#7C3AED', fontSize: 15, width: '100%' }}
-            className="text-white font-semibold transition-all active:scale-95"
-          >
-            {tx.step_start}
-          </button>
+          <p style={{ fontSize: 13, color: '#6B7280' }}>
+            {lang === 'es' ? 'Redirigiendo a tu cuenta…' : 'Redirecting to your account…'}
+          </p>
         </div>
       )}
 
-      {/* Error state */}
-      {worldError && !worldVerified && (
-        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 12, padding: 14, marginBottom: 12, textAlign: 'center' }}>
-          <p style={{ fontSize: 13, color: '#DC2626', fontWeight: 500 }}>{tx.worldid_error}</p>
-        </div>
-      )}
-
-      {/* Buttons */}
+      {/* Verify button + skip */}
       {!worldVerified && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {worldLoading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '16px 0' }}>
-              <div className="w-8 h-8 border-4 border-vivi-lila border-t-vivi-deep rounded-full animate-spin" />
-            </div>
-          ) : wldEnabled && IDKitWidget ? (
-            <IDKitWidget
-              app_id={wldAppId as string}
-              action={wldAction}
-              verification_level={VerificationLevel?.Device ?? 'device'}
-              onSuccess={handleWorldIDSuccess}
-            >
-              {({ open }: { open: () => void }) => (
-                <button
-                  onClick={open}
-                  style={{ height: 52, borderRadius: 14, background: '#2D1B4E', fontSize: 15, width: '100%' }}
-                  className="text-white font-semibold flex items-center justify-center gap-2 transition-all active:scale-95"
-                >
-                  <span>🌍</span> {worldError ? tx.worldid_retry : tx.worldid_cta}
-                </button>
-              )}
-            </IDKitWidget>
-          ) : (
-            <button
-              onClick={() => {
-                setWorldLoading(true)
-                setTimeout(() => { setWorldLoading(false); setWorldVerified(true) }, 1800)
-              }}
-              style={{ height: 52, borderRadius: 14, background: '#2D1B4E', fontSize: 15, width: '100%' }}
-              className="text-white font-semibold flex items-center justify-center gap-2 transition-all active:scale-95"
-            >
-              <span>🌍</span> {tx.worldid_cta}
-            </button>
-          )}
-
+          <WorldIDVerifyButton
+            lang={lang}
+            onVerified={() => {
+              setWorldVerified(true)
+              setTimeout(() => finish(true), 1000)
+            }}
+          />
           <button
             onClick={() => finish(false)}
             className="text-vivi-gray text-sm py-2 text-center hover:text-vivi-purple transition-colors"
